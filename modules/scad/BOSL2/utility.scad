@@ -748,8 +748,9 @@ function get_radius(r1, r2, r, d1, d2, d, dflt) =
 //   same way that OpenSCAD expands short vectors in some contexts, e.g. cube(10) or rotate([45,90]).  
 //   If `v` is a scalar, and `dflt==undef`, returns `[v, v, v]`.
 //   If `v` is a scalar, and `dflt!=undef`, returns `[v, dflt, dflt]`.
-//   If `v` is a vector and dflt is defined, returns the first 3 items, with any missing values replaced by `dflt`.
-//   If `v` is a vector and dflt is undef, returns the first 3 items, with any missing values replaced by 0.
+//   if `v` is a list of length 3 or more then returns `v`
+//   If `v` is a list and dflt is defined, returns a length 3 list by padding with `dflt`
+//   If `v` is a list and dflt is undef, returns a length 3 list by padding with 0
 //   If `v` is `undef`, returns `undef`.
 // Arguments:
 //   v = Value to return vector from.
@@ -771,17 +772,21 @@ function scalar_vec3(v, dflt) =
 // Topics: Geometry
 // See Also: circle(), cyl()
 // Usage:
-//   sides = segs(r);
+//   sides = segs(r, [angle]);
 // Description:
 //   Calculate the standard number of sides OpenSCAD would give a circle based on `$fn`, `$fa`, and `$fs`.
+//   If angle is given, calculate for an arc of the given angle.
 // Arguments:
-//   r = Radius of circle to get the number of segments for.
+//   r = Radius of circle/arc to get the number of segments for.
+//   angle = Angle of arc to get the get the number of segments for.
 // Example:
-//   $fn=12; sides=segs(10);  // Returns: 12
-//   $fa=2; $fs=3; sides=segs(10);  // Returns: 21
-function segs(r) = 
-    $fn>0? ($fn>3? $fn : 3) :
-    let( r = is_finite(r)? r : 0 )
+//   $fn=12; sides=segs(10);           // Returns: 12
+//   $fa=2; $fs=3; sides=segs(10);     // Returns: 21
+//   $fa=2; $fs=3; sides=segs(10,180); // Returns: 11
+function segs(r,angle) =
+    is_def(angle) ? ceil(segs(r)*abs(angle)/360-2e-15)  // 2e-15 needed in case angle is slightly large due to rounding error
+  : $fn>0? ($fn>3? $fn : 3)
+  : let( r = is_finite(r)? r : 0 )
     ceil(max(5, min(360/$fa, abs(r)*2*PI/$fs)));
 
 
@@ -876,6 +881,22 @@ module deprecate(new_name)
 }   
 
 
+
+// Module: echo_viewport()
+// Synopsis: Display the current viewport parameters. 
+// Usage:
+//   echo_viewport();
+// Description:
+//   Display the current viewport parameters so that they can be pasted into examples for the wiki.
+//   The viewport should have a 4:3 aspect ratio to ensure proper framing of the object.  
+
+module echo_viewport()
+{
+    echo(format("VPR=[{:.2f},{:.2f},{:.2f}],VPD={:.2f},VPT=[{:.2f},{:.2f},{:.2f}]", [each $vpr, $vpd, each $vpt]));
+}    
+
+
+
 // Section: Testing Helpers
 
 
@@ -935,7 +956,7 @@ module assert_approx(got, expected, info) {
 //   expected = The value that was expected.
 //   info = Extra info to print out to make the error clearer.
 // Example:
-//   assert_approx(3*9, 27, str("a=",3,", b=",9));
+//   assert_equal(3*9, 27, str("a=",3,", b=",9));
 module assert_equal(got, expected, info) {
     no_children($children);
     if (got != expected || (is_nan(got) && is_nan(expected))) {
@@ -965,7 +986,7 @@ module assert_equal(got, expected, info) {
 //   Returns the differential geometry if they are not quite the same shape and size.
 // Arguments:
 //   eps = The surface of the two shapes must be within this size of each other.  Default: 1/1024
-// Example:
+// Example(NORENDER):  (Example disabled because OpenSCAD bug prevents it from displaying)
 //   $fn=36;
 //   shape_compare() {
 //       sphere(d=100);
@@ -1045,7 +1066,7 @@ module shape_compare(eps=1/1024) {
 // Description:
 //   Returns true if the `state` value indicates the current loop should continue.  This is useful
 //   when using C-style for loops to iteratively calculate a value.  Used with `loop_while()` and
-//   `loop_done()`.  See [Looping Helpers](section-looping-helpers) for an example.
+//   `loop_done()`.  See [Looping Helpers](utility.scad#section-c-style-for-loop-helpers) for an example.
 // Arguments:
 //   state = The loop state value.
 function looping(state) = state < 2;
@@ -1061,7 +1082,7 @@ function looping(state) = state < 2;
 //   Given the current `state`, and a boolean `continue` that indicates if the loop should still be
 //   continuing, returns the updated state value for the the next loop.  This is useful when using
 //   C-style for loops to iteratively calculate a value.  Used with `looping()` and `loop_done()`.
-//   See [Looping Helpers](section-looping-helpers) for an example.
+//   See [Looping Helpers](utility.scad#section-c-style-for-loop-helpers) for an example.
 // Arguments:
 //   state = The loop state value.
 //   continue = A boolean value indicating whether the current loop should progress.
@@ -1079,7 +1100,7 @@ function loop_while(state, continue) =
 // Description:
 //   Returns true if the `state` value indicates the loop is finishing.  This is useful when using
 //   C-style for loops to iteratively calculate a value.  Used with `looping()` and `loop_while()`.
-//   See [Looping Helpers](#5-looping-helpers) for an example.
+//   See [Looping Helpers](utility.scad#section-c-style-for-loop-helpers) for an example.
 // Arguments:
 //   state = The loop state value.
 function loop_done(state) = state > 0;

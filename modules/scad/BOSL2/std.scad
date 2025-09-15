@@ -34,11 +34,12 @@ include <coords.scad>
 include <geometry.scad>
 include <regions.scad>
 include <strings.scad>
-include <skin.scad>
 include <vnf.scad>
+include <structs.scad>
+include <rounding.scad>
+include <skin.scad>
 include <utility.scad>
 include <partitions.scad>
-include <structs.scad>
 
 // vim: expandtab tabstop=4 shiftwidth=4 softtabstop=4 nowrap
 

@@ -198,9 +198,9 @@ module pco1810_cap(h, r, d, wall, texture="none", anchor=BOTTOM, spin=0, orient=
             difference() {
                 union() {
                     if (texture == "knurled") {
-                        cyl(d=w, h=hh, texture="diamonds", tex_size=[3,3], tex_style="concave", anchor=BOT);
+                        cyl(d=w, h=hh, texture="diamonds", tex_size=[3,3], style="concave", anchor=BOT);
                     } else if (texture == "ribbed") {
-                        cyl(d=w, h=hh, texture="ribs", tex_size=[3,3], tex_style="min_edge", anchor=BOT);
+                        cyl(d=w, h=hh, texture="ribs", tex_size=[3,3], style="min_edge", anchor=BOT);
                     } else {
                         cyl(d=w, l=hh, anchor=BOTTOM);
                     }
@@ -387,9 +387,9 @@ module pco1881_cap(wall=2, texture="none", anchor=BOTTOM, spin=0, orient=UP)
             difference() {
                 union() {
                     if (texture == "knurled") {
-                        cyl(d=w, h=11.2+wall, texture="diamonds", tex_size=[3,3], tex_style="concave", anchor=BOT);
+                        cyl(d=w, h=11.2+wall, texture="diamonds", tex_size=[3,3], style="concave", anchor=BOT);
                     } else if (texture == "ribbed") {
-                        cyl(d=w, h=11.2+wall, texture="ribs", tex_size=[3,3], tex_style="min_edge", anchor=BOT);
+                        cyl(d=w, h=11.2+wall, texture="ribs", tex_size=[3,3], style="min_edge", anchor=BOT);
                     } else {
                         cyl(d=w, l=11.2+wall, anchor=BOTTOM);
                     }
@@ -467,7 +467,6 @@ module generic_bottle_neck(
     roundover = 0.58 * diamMagMult;
     lip_roundover_r = (roundover > (neck_d - inner_d) / 2) ? 0 : roundover;
     h = height + support_width;
-    echo(h=h);
     threadbase_d = neck_d - 0.8 * diamMagMult;
 
     $fn = segs(33 / 2);
@@ -610,9 +609,9 @@ module generic_bottle_cap(
                     // thickness so the wall+texture are the specified wall thickness.  That
                     // seems wrong so this does specified thickness+texture
                     if (texture == "knurled") 
-                        cyl(d=w + 1.5*diamMagMult, l=h, texture="diamonds", tex_size=[3,3], tex_style="concave", anchor=BOT);
+                        cyl(d=w + 1.5*diamMagMult, l=h, texture="diamonds", tex_size=[3,3], style="concave", anchor=BOT);
                     else if (texture == "ribbed") 
-                        cyl(d=w + 1.5*diamMagMult, l=h, texture="ribs", tex_size=[3,3], tex_style="min_edge", anchor=BOT);
+                        cyl(d=w + 1.5*diamMagMult, l=h, texture="ribs", tex_size=[3,3], style="min_edge", anchor=BOT);
                     else 
                         cyl(d = w, l = h, anchor = BOTTOM);
                 }
@@ -693,14 +692,12 @@ module bottle_adapter_neck_to_cap(
                     : neck_support_od;
     cap_neck_id = default(cap_neck_id,neck_id);
     wall = default(wall, neck_support_od + neck_d + cap_od + neck_id - 2*tolerance);
-    echo(wall=wall);
 
     $fn = segs(33 / 2);
     wallt1 = min(wall, (max(neck_support_od, neck_d) - neck_id) / 2);
     wallt2 = min(wall, (cap_od + 2 * cap_wall - cap_neck_id) / 2);
 
     top_h = neck_h + max(1,neck_h/17)*sign(neck_support_od);
-    echo(top_h=top_h);
     bot_h = cap_h + cap_wall;
     attachable(anchor=anchor,orient=orient,spin=spin, r=max([neck_id/2+wallt1, cap_neck_id/2+wallt2, neck_support_od/2]), h=top_h+bot_h+d) {      
       zmove((bot_h-top_h)/2)
@@ -1298,7 +1295,6 @@ module sp_cap(diam,type,wall,style="L",top_adj=0, bot_adj=0, texture="none", anc
 
     twist = struct_val(_sp_twist, type);
 
-    echo(top_adj=top_adj,bot_adj=bot_adj);
     dum3=assert(top_adj<S+0.75*a, str("The top_adj value is too large so the thread won't fit.  It must be smaller than ",S+0.75*a));
     oprofile = _sp_thread_profile(tpi,a,S+0.75*a-top_adj,style,flip=true);
     bounds=pointlist_bounds(oprofile);
@@ -1314,9 +1310,9 @@ module sp_cap(diam,type,wall,style="L",top_adj=0, bot_adj=0, texture="none", anc
             difference(){
                 up(wall){
                    if (texture=="knurled")
-                        cyl(d=T+space+2*wall,l=H+wall-bot_adj,anchor=TOP,texture="trunc_pyramids", tex_size=[3,3], tex_style="convex");
+                        cyl(d=T+space+2*wall,l=H+wall-bot_adj,anchor=TOP,texture="trunc_pyramids", tex_size=[3,3], style="convex");
                    else if (texture == "ribbed") 
-                        cyl(d=T+space+2*wall,l=H+wall-bot_adj,anchor=TOP,chamfer2=.8,tex_taper=0,texture="trunc_ribs", tex_size=[3,3], tex_style="min_edge");
+                        cyl(d=T+space+2*wall,l=H+wall-bot_adj,anchor=TOP,chamfer2=.8,tex_taper=0,texture="trunc_ribs", tex_size=[3,3], style="min_edge");
                    else
                         cyl(d=T+space+2*wall,l=H+wall-bot_adj,anchor=TOP,chamfer2=.8);
                 }

@@ -1082,7 +1082,7 @@ function zscale(z=1, p=_NO_ARG, cp=0) =
 function mirror(v, p=_NO_ARG) =
     assert(is_vector(v))
     assert(p==_NO_ARG || is_list(p),"Invalid pointlist")
-    let(m = len(v)==2? affine2d_mirror(v) : affine3d_mirror(v))
+    let(m = affine3d_mirror(v))
     p==_NO_ARG? m : apply(m,p);
 
 
@@ -1405,6 +1405,8 @@ module frame_map(x,y,z,p,reverse=false)
 //   skew(syx=0.5) cube(40, center=true);
 // Example: Skew along the Y axis in 3D as a factor of Z coordinate.
 //   skew(syz=0.5) cube(40, center=true);
+// Example(3D,VPR=[71.80,0.00,338.10],VPD=155.56,VPT=[9.03,9.43,-7.03]): Skew by 30º along the Z axis.  
+//   skew(azx=30) cube([40,40,5],center=true);
 // Example: Skew along the Z axis in 3D as a factor of X coordinate.
 //   skew(szx=0.5) cube(40, center=true);
 // Example: Skew along the Z axis in 3D as a factor of Y coordinate.

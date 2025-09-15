@@ -260,14 +260,14 @@ function rect(size=1, rounding=0, chamfer=0, atype="box", anchor=CENTER, spin=0,
 // Example(2D): Fit to Three Points
 //   pts = [[50,25], [25,-25], [-10,0]];
 //   circle(points=pts);
-//   color("red") move_copies(pts) circle();
+//   color("red") move_copies(pts) circle(r=1.5,$fn=12);
 // Example(2D): Fit Tangent to Inside Corner of Two Segments
 //   path = [[50,25], [-10,0], [25,-25]];
 //   circle(corner=path, r=15);
 //   color("red") stroke(path);
 // Example(2D): Called as Function
 //   path = circle(d=50, anchor=FRONT, spin=45);
-//   stroke(path);
+//   stroke(path,closed=true);
 function circle(r, d, points, corner, anchor=CENTER, spin=0) =
     assert(is_undef(corner) || (is_path(corner,[2]) && len(corner) == 3))
     assert(is_undef(points) || is_undef(corner), "Cannot specify both points and corner.")
@@ -377,41 +377,41 @@ module circle(r, d, points, corner, anchor=CENTER, spin=0) {
 //   r=[10,3];
 //   ydistribute(7){
 //     union(){
-//       stroke([ellipse(r=r, $fn=100)],width=0.05,color="blue");
-//       stroke([ellipse(r=r, $fn=6)],width=0.1,color="red");
+//       stroke([ellipse(r=r, $fn=100)],width=0.1,color="blue");
+//       stroke([ellipse(r=r, $fn=6)],width=0.2,color="red");
 //     }
 //     union(){
-//       stroke([ellipse(r=r, $fn=100)],width=0.05,color="blue");
-//       stroke([ellipse(r=r, $fn=6,uniform=true)],width=0.1,color="red");
+//       stroke([ellipse(r=r, $fn=100)],width=0.1,color="blue");
+//       stroke([ellipse(r=r, $fn=6,uniform=true)],width=0.2,color="red");
 //     }
 //   }
-// Example(2D): The realigned hexagons are even more different
+// Example(2D,NoAxes): The realigned hexagons are even more different
 //   r=[10,3];
 //   ydistribute(7){
 //     union(){
-//       stroke([ellipse(r=r, $fn=100)],width=0.05,color="blue");
-//       stroke([ellipse(r=r, $fn=6,realign=true)],width=0.1,color="red");
+//       stroke([ellipse(r=r, $fn=100)],width=0.1,color="blue");
+//       stroke([ellipse(r=r, $fn=6,realign=true)],width=0.2,color="red");
 //     }
 //     union(){
-//       stroke([ellipse(r=r, $fn=100)],width=0.05,color="blue");
-//       stroke([ellipse(r=r, $fn=6,realign=true,uniform=true)],width=0.1,color="red");
+//       stroke([ellipse(r=r, $fn=100)],width=0.1,color="blue");
+//       stroke([ellipse(r=r, $fn=6,realign=true,uniform=true)],width=0.2,color="red");
 //     }
 //   }
-// Example(2D): For odd $fn the result may not look very elliptical:
+// Example(2D,NoAxes): For odd $fn the result may not look very elliptical:
 //    r=[10,3];
 //    ydistribute(7){
 //      union(){
-//        stroke([ellipse(r=r, $fn=100)],width=0.05,color="blue");
-//        stroke([ellipse(r=r, $fn=5,realign=false)],width=0.1,color="red");
+//        stroke([ellipse(r=r, $fn=100)],width=0.1,color="blue");
+//        stroke([ellipse(r=r, $fn=5,realign=false)],width=0.2,color="red");
 //      }
 //      union(){
-//        stroke([ellipse(r=r, $fn=100)],width=0.05,color="blue");
-//        stroke([ellipse(r=r, $fn=5,realign=false,uniform=true)],width=0.1,color="red");
+//        stroke([ellipse(r=r, $fn=100)],width=0.1,color="blue");
+//        stroke([ellipse(r=r, $fn=5,realign=false,uniform=true)],width=0.2,color="red");
 //      }
 //    }
-// Example(2D): The same ellipse, turned 90 deg, gives a very different result:
+// Example(2D,NoAxes): The same ellipse, turned 90 deg, gives a very different result:
 //   r=[3,10];
-//   xdistribute(7){
+//   xdistribute(9){
 //     union(){
 //       stroke([ellipse(r=r, $fn=100)],width=0.1,color="blue");
 //       stroke([ellipse(r=r, $fn=5,realign=false)],width=0.2,color="red");
@@ -432,16 +432,18 @@ module ellipse(r, d, realign=false, circum=false, uniform=false, anchor=CENTER, 
     attachable(anchor,spin, two_d=true, r=[rx,ry]) {
         if (uniform) {
             check = assert(!circum, "Circum option not allowed when \"uniform\" is true");
-            polygon(ellipse(r,realign=realign, circum=circum, uniform=true));
+            polygon(ellipse(r, realign=realign, circum=circum, uniform=true));
         }
         else if (rx < ry) {
             xscale(rx/ry) {
+                realign = circum? !realign : realign;
                 zrot(realign? 180/sides : 0) {
                     circle(r=ry, $fn=sides);
                 }
             }
         } else {
             yscale(ry/rx) {
+                realign = circum? !realign : realign;
                 zrot(realign? 180/sides : 0) {
                     circle(r=rx, $fn=sides);
                 }
@@ -504,7 +506,8 @@ function _ellipse_refine_realign(a,b,N, _theta=[],i=0) =
 function ellipse(r, d, realign=false, circum=false, uniform=false, anchor=CENTER, spin=0) =
     let(
         r = force_list(get_radius(r=r, d=d, dflt=1),2),
-        sides = segs(max(r))
+        sides = segs(max(r)),
+        realign = circum? !realign : realign
     )
     assert(all_positive(r), "All components of the radius must be positive.")
     uniform
@@ -585,7 +588,7 @@ function regular_ngon(n=6, r, d, or, od, ir, id, side, rounding=0, realign=false
     assert(is_int(n) && n>=3)
     assert(is_undef(align_tip) || is_vector(align_tip))
     assert(is_undef(align_side) || is_vector(align_side))
-    assert(is_undef(align_tip) || is_undef(align_side), "Can only specify one of align_tip and align-side")
+    assert(is_undef(align_tip) || is_undef(align_side), "Can only specify one of align_tip and align_side")
     let(
         sc = 1/cos(180/n),
         ir = is_finite(ir)? ir*sc : undef,
@@ -889,7 +892,7 @@ function right_triangle(size=[1,1], center, anchor, spin=0) =
         size = is_num(size)? [size,size] : size,
         anchor = get_anchor(anchor, center, [-1,-1], [-1,-1])
     )
-    assert(is_vector(size,2))
+    assert(is_vector(size,2), "Size must be a scalar or 2-vector")
     assert(min(size)>0, "Must give positive size")
     let(
         path = [ [size.x/2,-size.y/2], [-size.x/2,-size.y/2], [-size.x/2,size.y/2] ],
@@ -901,7 +904,7 @@ function right_triangle(size=[1,1], center, anchor, spin=0) =
 module right_triangle(size=[1,1], center, anchor, spin=0) {
     size = is_num(size)? [size,size] : size;
     anchor = get_anchor(anchor, center, [-1,-1], [-1,-1]);
-    check = assert(is_vector(size,2));
+    check = assert(is_vector(size,2), "Size must be a scalar or 2-vector");
     path = right_triangle(size, anchor="origin");
     anchors = [
         named_anchor("hypot", CTR, unit([size.y,size.x])),
@@ -1321,26 +1324,33 @@ module jittered_poly(path, dist=1/512) {
 // Section: Curved 2D Shapes
 
 
+//   When called as a module, makes a 2D teardrop shape. Useful for extruding into 3D printable holes as it limits overhang to a desired angle.
+//   Uses "intersect" style anchoring.
+
+
 // Function&Module: teardrop2d()
 // Synopsis: Creates a 2D teardrop shape.
 // SynTags: Geom, Path
 // Topics: Shapes (2D), Paths (2D), Path Generators, Attachable
 // See Also: teardrop(), onion(), keyhole()
 // Description:
-//   When called as a module, makes a 2D teardrop shape. Useful for extruding into 3D printable holes as it limits overhang to 45 degrees.  Uses "intersect" style anchoring.  
-//   The cap_h parameter truncates the top of the teardrop.  If cap_h is taller than the untruncated form then
-//   the result will be the full, untruncated shape.  The segments of the bottom section of the teardrop are
-//   calculated to be the same as a circle or cylinder when rotated 90 degrees.  (Note that this agreement is poor when `$fn=6` or `$fn=7`.  
+//   A teardrop shape is a circle that comes to a point at the top.  This shape is useful for extruding into 3d printable holes as it
+//   limits the overhang angle.  A bottom point can also help ensure a 3d printable hole.  This module can make a teardrop shape
+//   or produce the path for a teardrop with a point at the top or with the top truncated to create a flat cap.  It also provides the option to add a bottom point.
+//   .
+//   The default teardrop has a pointed top and round bottom.  The `ang` parameter specifies the angle away from vertical of the two flat segments at the
+//   top of the shape.  The cap_h parameter truncates the top of the teardrop at the specified
+//   distance from the center.  If `cap_h` is taller than the untruncated form then
+//   the result will be the full, untruncated shape.  You can set `cap_h` smaller than the radius to produce a truncated circle.  The segments of the round section of the teardrop 
+//   are the same as a circle or cylinder with matching `$fn` when rotated 90 degrees.  The number of facets in the teardrop is only approximately
+//   equal to `$fn`, and may also change if you set `realign=true`, which adjusts the facets so the bottom of the teardrop has a flat base.  
 //   If `$fn` is a multiple of four then the teardrop will reach its extremes on all four axes.  The circum option
-//   produces a teardrop that circumscribes the circle; in this case set `realign=true` to get a teardrop that meets its internal extremes
-//   on the axes.  
-//   When called as a function, returns a 2D path to for a teardrop shape.
-//
+//   produces a teardrop that circumscribes the circle; in this, `realign=true` produces a teardrop that meets its internal extremes
+//   on the axes.  You can add a bottom corner using the `bot_corner` parameter, which specifies the length that the corner protrudes from the ideal circle.
 // Usage: As Module
-//   teardrop2d(r/d=, [ang], [cap_h]) [ATTACHMENTS];
+//   teardrop2d(r/d=, [ang], [cap_h], [circum=], [realign=], [bot_corner=]) [ATTACHMENTS];
 // Usage: As Function
-//   path = teardrop2d(r|d=, [ang], [cap_h]);
-//
+//   path = teardrop2d(r|d=, [ang], [cap_h], [circum=], [realign=], [bot_corner=]);
 // Arguments:
 //   r = radius of circular part of teardrop.  (Default: 1)
 //   ang = angle of hat walls from the Y axis (half the angle of the peak).  (Default: 45 degrees)
@@ -1348,19 +1358,22 @@ module jittered_poly(path, dist=1/512) {
 //   ---
 //   d = diameter of circular portion of bottom. (Use instead of r)
 //   circum = if true, create a circumscribing teardrop.  Default: false
+//   bot_corner = create a bottom corner the specified distance below the given radius.  Default: 0
 //   realign = if true, change whether bottom of teardrop is a point or a flat.  Default: false
 //   anchor = Translate so anchor point is at origin (0,0,0).  See [anchor](attachments.scad#subsection-anchor).  Default: `CENTER`
 //   spin = Rotate this many degrees around the Z axis after anchor.  See [spin](attachments.scad#subsection-spin).  Default: `0`
-//
 // Example(2D): Typical Shape
 //   teardrop2d(r=30, ang=30);
 // Example(2D): Crop Cap
 //   teardrop2d(r=30, ang=30, cap_h=40);
 // Example(2D): Close Crop
 //   teardrop2d(r=30, ang=30, cap_h=20);
-module teardrop2d(r, ang=45, cap_h, d, circum=false, realign=false, anchor=CENTER, spin=0)
+// Example(2D): Add bottom corner.  Here the bottom corner is quite large.  Guidance for 3d printing suggests that `bot_corner` should equal the layer thickness.
+//   teardrop2d(r=30, cap_h=35, bot_corner=5);
+
+module teardrop2d(r, ang=45, cap_h, d, circum=false, realign=false, bot_corner=0, anchor=CENTER, spin=0)
 {
-    path = teardrop2d(r=r, d=d, ang=ang, circum=circum, realign=realign, cap_h=cap_h);
+    path = teardrop2d(r=r, d=d, ang=ang, circum=circum, realign=realign, cap_h=cap_h, bot_corner=bot_corner);
     attachable(anchor,spin, two_d=true, path=path, extent=false) {
         polygon(path);
         children();
@@ -1370,9 +1383,32 @@ module teardrop2d(r, ang=45, cap_h, d, circum=false, realign=false, anchor=CENTE
 // _extrapt = true causes the point to be duplicated so a teardrop with no cap
 // has the same point count as one with a cap.  
 
-function teardrop2d(r, ang=45, cap_h, d, circum=false, realign=false, anchor=CENTER, spin=0, _extrapt=false) =
+function teardrop2d(r, ang=45, cap_h, d, circum=false, realign=false, anchor=CENTER, spin=0, bot_corner=0, _extrapt=false) =
     let(
-        r = get_radius(r=r, d=d, dflt=1),
+        r = get_radius(r=r, d=d, dflt=1)
+    )  
+    bot_corner!=0 ?
+       assert(all_nonnegative([bot_corner]),"bot_corner must be nonnegative")
+       let(
+           path = teardrop2d(r=r,ang=ang, cap_h=cap_h, circum=circum, realign=realign),
+           corner = -r-bot_corner,
+           alpha = acos(r/corner),
+           joint = r*[sin(alpha),cos(alpha)],
+           table = [[0,corner],joint],
+           halfpath = [for(pt=path) if (pt.x>=0)
+                          let(proj=lookup(pt.x,table))
+                          pt.x>joint.x || pt.y>0 || pt.y<=proj ? pt : [pt.x,proj]],
+           fullpath = deduplicate(
+                                   [
+                                     each halfpath,
+                                     if (last(halfpath).x>0) [0,corner],
+                                     each reverse(xflip(halfpath))
+                                   ], closed=!_extrapt
+                                 )
+       )
+       reorient(anchor,spin,two_d=true, path=fullpath, p=fullpath, extent=false)
+  :
+    let(
         minheight = r*sin(ang),
         maxheight = r/sin(ang), //cos(90-ang),
         pointycap = is_undef(cap_h) || cap_h>=maxheight
@@ -1412,7 +1448,7 @@ function teardrop2d(r, ang=45, cap_h, d, circum=false, realign=false, anchor=CEN
                [
                  cap[0],
                  p,
-                 each select(fullcircle,i+1,-i-1-(realign?1:0)),
+                 each select(fullcircle,i+1,-i-1-(realign!=circum?1:0)),
                  xflip(p),
                  if(_extrapt || !pointycap) xflip(cap[0])
                ]
@@ -1525,34 +1561,41 @@ module egg(length,r1,r2,R,d1,d2,D,anchor=CENTER, spin=0)
 // Usage: ring or partial ring passing through three points
 //   region=ring(n, [ring_width], [r=,d=], points=[P0,P1,P2], [full=]);
 // Usage: ring or partial ring from tangent point on segment `[P0,P1]` to the tangent point on segment `[P1,P2]`.
-//   region=ring(n, [ring_width], corner=[P0,P1,P2], [r=,d=], [r1|d1=], [r2=|d2=], [full=]);
+//   region=ring(n, corner=[P0,P1,P2], r1=|d1=, r2=|d2=, [full=]);
 // Usage: ring or partial ring based on setting a width at the X axis and height above the X axis
 //   region=ring(n, [ring_width], [r=|d=], width=, thickness=, [full=]);
 // Usage: as a module
 //   ring(...) [ATTACHMENTS];
 // Description:
-//   If called as a function returns a region or path for a ring or part of a ring.  If called as a module, creates the corresponding 2D ring or partial ring shape.
+//   If called as a function, returns a region or path for a ring or part of a ring.  If called as a module, creates the corresponding 2D ring or partial ring shape.
 //   The geometry of the ring can be specified using any of the methods supported by {{arc()}}.  If `full` is true (the default) the ring will be complete and the
 //   returned value a region.  If `full` is false then the return is a path describing a partial ring.  The returned path is always clockwise with the larger radius arc first.
-//   A ring has two radii, the inner and outer.  When specifying geometry you must somehow specify one radius, which can be directly with `r=` or `r1=` or by giving a point list with 
-//   or without a center point.  You specify the second radius by giving `r=` directly, or `r2=` if you used `r1=` for the first radius, or by giving `ring_width`.  If `ring_width`
-//   the second radius will be larger than the first; if `ring_width` is negative the second radius will be smaller. 
+//   .
+//   You can specify the ring dimensions in a variety of ways similar to how you can use {{arc()}}.
+//   * Provide two radii or diameters using `r1` or `d1` and `r2` or `d2`.
+//   * Specify `r` or `d` and `ring_width`.  A positive `ring_width` value will grow the ring outward from your given radius/diameter; if you give a negative `ring_width` then the ring will grow inward from your given radius/diameter.
+//   * Set `points` to a list of three points then an arc is chosen to pass through those points and the second arc of the ring is defined by either `ring_width`, `r` or `d`. 
+//   * Give `width`, `thickness`, and either `r`, `d` or `ring_width`.  The `width` and `thickness` define an arc whose endpoints lie on the X axis with the specified width between them, and whose height is `thickness`.  The ring is defined by that arc, combined with either `ring_width` or the given radius/diameter.
+//   .
+//   If you specify the ring using `points` or using `width` and `thickness` then that determine its location.  Otherwise the ring appears centered at the origin.
+//   In that case, you can shift it to a different center point by setting `cp`.  Alternatively you can set `corner` to a list of three points defining a corner and the
+//   ring will be placed tangent to that corner.  
 // Arguments:
 //   n = Number of vertices to use for the inner and outer portions of the ring
 //   ring_width = width of the ring.  Can be positive or negative
 //   ---
-//   r1/d1 = inner radius or diameter of the ring
-//   r2/d2 = outer radius or diameter of the ring
-//   r/d = second radius or diameter of ring when r1 or d1 are not given
+//   r1/d1 = one of the radii or diameters of the ring.  Must combine with `r2/d2`.
+//   r2/d2 = one of the radii or diameters of the ring.  Must combine with `r1/d1`.
+//   r/d = radius or diameter of the ring.  Must combine with `ring_width`, `points` or `center`
 //   full = if true create a full ring, if false create a partial ring.  Default: true unless `angle` is given
 //   cp = Centerpoint of ring.
-//   points = Points on the ring boundary.
-//   corner = A path of two segments to fit the ring tangent to.
+//   points = Points on the ring boundary.  Combine with `r/d` or `ring_width`
+//   corner = A path of two segments to fit the ring tangent to.  Combine with `r1/d1` and `r2/d2` or with `r/d` and `ring_width`.  
 //   long = if given with cp and points takes the long arc instead of the default short arc.  Default: false
 //   cw = if given with cp and 2 points takes the arc in the clockwise direction.  Default: false
 //   ccw = if given with cp and 2 points takes the arc in the counter-clockwise direction.  Default: false
-//   width = If given with `thickness`, ring is defined based on an arc with ends on X axis.
-//   thickness = If given with `width`, ring is defined based on an arc with ends on X axis, and this height above the X axis. 
+//   width = If given with `thickness`, ring is defined based on an arc with ends on X axis.  Must combine with `thickness` and one of `ring_width`, `r` or `d`. 
+//   thickness = If given with `width`, ring is defined based on an arc with ends on X axis, and this height above the X axis.   Must combine with `width` and one of`ring_width`, `r` or `d`. 
 //   start = Start angle of ring.  Default: 0
 //   angle = If scalar, the end angle in degrees relative to start parameter.  If a vector specifies start and end angles of ring.  
 //   anchor = Translate so anchor point is at origin (0,0,0).  See [anchor](attachments.scad#subsection-anchor).  (Module only) Default: `CENTER`
@@ -1577,7 +1620,7 @@ module egg(length,r1,r2,R,d1,d2,D,anchor=CENTER, spin=0)
 //   corner = [[0,0],[4,4],[7,3]];
 //   ring(corner=corner, r=3, ring_width=1,n=22,full=false);
 //   stroke(corner, width=.1,color="red");
-// Example(2D):
+// Example(2D): Here the red dashed area shows the partial ring bounded by the specified width and thickness arc at the inside and then expanding by the ring width of 2.   
 //   $fn=128;
 //   region = ring(width=5,thickness=1.5,ring_width=2);   
 //   path = ring(width=5,thickness=1.5,ring_width=2,full=false);
@@ -1613,8 +1656,9 @@ function ring(n,ring_width,r,r1,r2,angle,d,d1,d2,cp,points,corner, width,thickne
     assert(is_undef(points) || is_path(points,2), str("Points must be a 2d vector",points))
     assert(!any_defined([points,thickness,width]) || num_defined([r1,r2])==0, "Cannot give r1, r2, d1, or d2 with points, width or thickness")
     is_def(width) && is_def(thickness)?
-       assert(!any_defined([r,cp,points,angle,start]), "Conflicting or invalid parameters to ring")
+       assert(!any_defined([cp,points,angle,start]), "Can only give 'ring_width', 'r' or 'd' with 'width' and 'thickness'")
        assert(all_positive([width,thickness]), "Width and thickness must be positive")
+       assert(num_defined([r,ring_width])==1, "Must give 'r' or 'ring_width' (but not both) with 'width' and 'thickness'")
        ring(n=n,r=r,ring_width=ring_width,points=[[width/2,0], [0,thickness], [-width/2,0]],full=full)
   : full && is_undef(cp) && is_def(points) ?
        assert(is_def(points) && len(points)==3, "Without cp given, must provide exactly three points")
@@ -2255,7 +2299,7 @@ module text(text, size=10, font, halign, valign, spacing=1.0, direction="ltr", l
         $parent_size   = _attach_geom_size(geom);
         $attach_to   = undef;
         if (_is_shown()){
-            _color($color) {
+            _color($color) _show_ghost() {
                 _text(
                     text=text, size=size, font=font,
                     halign=ha, valign=va, spacing=spacing,

@@ -390,7 +390,7 @@ function bselect(list,index) =
 //   e = repeat(4, -1);       // Returns []
 function repeat(val, n, i=0) =
     is_num(n)? [for(j=[1:1:n]) val] :
-    assert( is_list(n), "Invalid count number.")
+    assert( is_vector(n), "Invalid count number.")
     (i>=len(n))? val :
     [for (j=[1:1:n[i]]) repeat(val, n, i+1)];
 
@@ -461,7 +461,7 @@ function list(l) = is_list(l)? l : [for (x=l) x];
 // Arguments:
 //   value = The value or list to coerce into a list.
 //   n = The number of items in the coerced list.  Default: 1
-//   fill = The value to pad the coerced list with, after the firt value.  Default: undef (pad with copies of `value`)
+//   fill = The value to pad the coerced list with, after the first value.  Default: undef (pad with copies of `value`)
 // Example:
 //   x = force_list([3,4,5]);  // Returns: [3,4,5]
 //   y = force_list(5);  // Returns: [5]
@@ -501,7 +501,7 @@ function reverse(list) =
 // Description:
 //   Rotates the contents of a list by `n` positions left, so that list[n] becomes the first entry of the list.
 //   If `n` is negative, then the rotation is `abs(n)` positions to the right.
-//   If `list` is a string, then a string is returned with the characters rotates within the string.
+//   If `list` is a string, then a string is returned with the characters rotated within the string.
 // Arguments:
 //   list = The list to rotate.
 //   n = The number of positions to rotate by.  If negative, rotated to the right.  Positive rotates to the left.  Default: 1
