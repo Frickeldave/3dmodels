@@ -89,8 +89,9 @@ module skadis_piggyback(
     edge_radius_plate = 2,      // Radius for rounded edges (mm) -> Must be less than half of the thickness
     edge_radius_holes = 2,      // Radius for rounded edges (mm) -> Must be less than half of the thickness
     draw_holes = true,          // Set to false to disable hole cutting (for debugging)
-    hole_type = "standard",   // Type of holes: "standard" or "chamfered"
-    fn = 16                    // Resolution for curves
+    hole_type = "standard",     // Type of holes: "standard" or "chamfered"
+    fn = 16,                    // Resolution for curves
+    depth = 20                   // Depth of the piggyback section (mm)
 
 ) {
 
@@ -103,17 +104,25 @@ module skadis_piggyback(
     plate_width = holes_x % 2 == 0 ? (holes_x / 2 - 1) * hole_spacing_x + row_offset + 2 * bd : floor(holes_x / 2) * hole_spacing_x + 2 * bd;
     plate_height = (holes_y - 1) * hole_spacing_y + 2 * bd;
 
-    difference() {
-        // Pass configurable border distance into the baseplate call
-        skadis_baseplate(holes_x, holes_y, border_distance = bd, hole_type = "standard", draw_holes = true);
+    spacer = depth - plate_thickness;
 
-        // Cut out the edges
-        if (holes_y % 2 == 0) {
+    color("blue")
+    translate([-plate_width/2, -plate_height/2, - spacer])
+    cube([plate_width, plate_thickness, spacer]);
+
+    difference() {
+        
+        union() {
+            // Pass configurable border distance into the baseplate call
+            skadis_baseplate(holes_x, holes_y, border_distance = bd, hole_type = "standard", draw_holes = true);
+        }
+        //Cut out the edges
+        if (holes_y % 2 == 0) { // even number of holes in Y direction
             // Cut out the left edge
             triangle_size = 30;
             color("red")
             translate([0, 0, -1])
-            linear_extrude(height = plate_thickness + 2)
+            linear_extrude(height = plate_thickness + spacer + 2)
             polygon(points = [
                 [plate_width / 2 - triangle_size, plate_height / 2 + 1],
                 [plate_width / 2 + 1, plate_height / 2 + 1],
@@ -123,18 +132,18 @@ module skadis_piggyback(
             // Cut out the right edge
             color("red")
             translate([0, 0, -1])
-            linear_extrude(height = plate_thickness + 2)
+            linear_extrude(height = plate_thickness + spacer + 2)
             polygon(points = [
                 [plate_width / 2 - triangle_size, -plate_height / 2 - 1],
                 [plate_width / 2 + 1, -plate_height / 2 - 1],
                 [plate_width / 2 + 1, -plate_height / 2 - 1 + triangle_size]
             ]);
-        } else {
+        } else { // odd number of holes in Y direction
             // Cut out the left edge
             triangle_size = 70;
             color("red")
             translate([0, 0, -1])
-            linear_extrude(height = plate_thickness + 2)
+            linear_extrude(height = plate_thickness + spacer + 2)
             polygon(points = [
                 [plate_width / 2 - triangle_size, plate_height / 2 + 1],
                 [plate_width / 2 + 1, plate_height / 2 + 1],
@@ -144,7 +153,7 @@ module skadis_piggyback(
             // Cut out the right edge
             color("red")
             translate([0, 0, -1])
-            linear_extrude(height = plate_thickness + 2)
+            linear_extrude(height = plate_thickness + spacer + 2)
             polygon(points = [
                 [plate_width / 2 - triangle_size, -plate_height / 2 - 1],
                 [plate_width / 2 + 1, -plate_height / 2 - 1],
@@ -235,13 +244,3 @@ module rounded_square(s, r) {
             circle(r = r);
     }
 }
-
-// color("grey")
-// translate([0, 0, -5])
-// skadis_baseplate(holes_x = 10, holes_y = 10, hole_type = "standard", draw_holes = true);
-
-
-skadis_piggyback(holes_x = 7, holes_y = 8, hole_type = "standard", draw_holes = true);
-
-
-

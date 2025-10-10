@@ -1,7 +1,7 @@
 // Test file to demonstrate external usage of the IKEA Skadis Baseplate module
 
 // Include the baseplate module
-include <IKEA SKadis v3 Baseplate.scad>
+use <IKEA SKadis v3 Baseplate.scad>
 
 // Example 1: Basic usage with default parameters
 color("lightgray")
@@ -37,3 +37,6 @@ skadis_baseplate(
 color("lightgoldenrodyellow")
 translate([-170, -150, 0])
 skadis_baseplate(holes_x = 7, holes_y = 7, hole_type = "standard", draw_holes = true);
+
+// Example 7: Piggyback configuration with standard holes
+skadis_piggyback(holes_x = 7, holes_y = 8, hole_type = "standard", draw_holes = true);
