@@ -2,6 +2,8 @@
 // Parametric model for creating custom sized baseplates
 // By frickeldave
 
+use <./IKEA Skadis v3 hook.scad>
+
 // IKEA Skadis specifications (usually don't need to be changed)
 hole_spacing_x = 40;        // Distance between hole centers in X (mm)
 hole_spacing_y = 20;        // Distance between hole centers in Y (mm)
@@ -106,22 +108,51 @@ module skadis_piggyback(
 
     spacer = depth - plate_thickness;
 
-    color("blue")
-    translate([-plate_width/2, -plate_height/2, - spacer])
-    cube([plate_width, plate_thickness, spacer]);
-
     difference() {
         
         union() {
             // Pass configurable border distance into the baseplate call
             skadis_baseplate(holes_x, holes_y, border_distance = bd, hole_type = "standard", draw_holes = true);
+
+            color("blue")
+            translate([- plate_width / 2, - plate_height / 2, - spacer])
+            cube([plate_width, plate_thickness, spacer]);
+
+            color("blue")
+            translate([- plate_width / 2, plate_height / 2 - plate_thickness, - spacer])
+            cube([plate_width, plate_thickness, spacer]);
+
+            color("blue")
+            translate([- plate_width / 2, - plate_height / 2 + plate_thickness, - spacer])
+            cube([plate_thickness, plate_height - plate_thickness * 2, spacer]);
+
+            color("pink")
+            translate([-plate_width / 2 + 52.5, plate_height / 2 - plate_thickness, - spacer + 1.7])
+            rotate([270, 0, 90])
+            ikea_skadis_holder();
+
+            color("pink")
+            translate([-plate_width / 2 + 132.5, plate_height / 2 - plate_thickness, - spacer + 1.7])
+            rotate([270, 0, 90])
+            ikea_skadis_holder();
+
+            color("pink")
+            translate([-plate_width / 2 + 52.5, -plate_height / 2, - spacer + 1.7])
+            rotate([270, 0, 90])
+            ikea_skadis_holder();
+
+            color("pink")
+            translate([-plate_width / 2 + 132.5, -plate_height / 2, - spacer + 1.7])
+            rotate([270, 0, 90])
+            ikea_skadis_holder();
+
         }
         //Cut out the edges
         if (holes_y % 2 == 0) { // even number of holes in Y direction
             // Cut out the left edge
             triangle_size = 30;
             color("red")
-            translate([0, 0, -1])
+            translate([0, 0, -spacer - 1])
             linear_extrude(height = plate_thickness + spacer + 2)
             polygon(points = [
                 [plate_width / 2 - triangle_size, plate_height / 2 + 1],
@@ -131,7 +162,7 @@ module skadis_piggyback(
 
             // Cut out the right edge
             color("red")
-            translate([0, 0, -1])
+            translate([0, 0, - spacer - 1])
             linear_extrude(height = plate_thickness + spacer + 2)
             polygon(points = [
                 [plate_width / 2 - triangle_size, -plate_height / 2 - 1],
@@ -140,9 +171,9 @@ module skadis_piggyback(
             ]);
         } else { // odd number of holes in Y direction
             // Cut out the left edge
-            triangle_size = 70;
+            triangle_size = 40;
             color("red")
-            translate([0, 0, -1])
+            translate([0, 0, - spacer - 1])
             linear_extrude(height = plate_thickness + spacer + 2)
             polygon(points = [
                 [plate_width / 2 - triangle_size, plate_height / 2 + 1],
@@ -152,7 +183,7 @@ module skadis_piggyback(
 
             // Cut out the right edge
             color("red")
-            translate([0, 0, -1])
+            translate([0, 0, - spacer - 1])
             linear_extrude(height = plate_thickness + spacer + 2)
             polygon(points = [
                 [plate_width / 2 - triangle_size, -plate_height / 2 - 1],
@@ -244,3 +275,10 @@ module rounded_square(s, r) {
             circle(r = r);
     }
 }
+
+
+color("lightgoldenrodyellow")
+skadis_baseplate(holes_x = 10, holes_y = 10, hole_type = "standard", draw_holes = true);
+
+translate([10, 10.2, 40])
+skadis_piggyback(holes_x = 8, holes_y = 7, hole_type = "standard", draw_holes = true, depth = 30);
