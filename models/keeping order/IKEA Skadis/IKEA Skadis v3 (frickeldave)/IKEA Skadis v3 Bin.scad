@@ -1,13 +1,3 @@
-$fn = 100;
-
-_width = 54;
-_depth = 40;
-_height = 20;
-_thickness = 2;
-_type = "r"; // c=cube, rc=rounded cube, r=rounded
-
-_backplate_distance = 0; // additional space between bin and backplate
-
 use <../../../../modules/scad/roundedcube.scad>
 use <./IKEA Skadis v3 Plate.scad>
 
@@ -31,7 +21,17 @@ module bin(_w, _d, _h, _t, _r, _rh, _tp, _bpd) {
         }
     }
     if(_tp == "rc") {
-        roundedcube(size = [_w, _d, _h], center = false, radius = _r);
+        translate([0, -_d - _bpd, 0])
+        difference() {
+            union() {
+                roundedcube(size = [_w, _d, _h], center = false, radius = _r, "z");
+                translate([0, _d - _r, 0])
+                cube([_w, _r + _bpd, _h]);
+            }
+            color("red")
+            translate([_t, _t, _t])
+            roundedcube(size = [_w - _t * 2, _d - _t * 2, _h + 1], center = false, radius = _r, "z");
+        }
     }
     if(_tp == "r") {
         
@@ -58,5 +58,3 @@ module bin(_w, _d, _h, _t, _r, _rh, _tp, _bpd) {
         }
     }
 }
-
-bin(_width, _depth, _height, _thickness, 0, 1, _type, _backplate_distance);
