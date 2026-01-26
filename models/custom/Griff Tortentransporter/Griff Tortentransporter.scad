@@ -9,20 +9,21 @@ difference() {
         translate([0, 0, -5.5])
         cube([79, 26, 2.5]);
 
-        translate([-5, 0, 0])
+        color("yellow")
+        translate([-4, 0, 0])
         rotate([0, 90, 0])
-        cylinder(h=79 + 5 + 5, d=3.5);
+        cylinder(h=79 + 4 + 4, d=3.4);
 
         color("green")
-        translate([0, 13.6, -5.6 + 2.5])
+        translate([0, 14.1, -5.6 + 2.5])
         cube([79, 2, 5.6]);
 
         color("pink")
-        translate([7, 13.6 - 1.3, 0.5])
+        translate([7, 14.1 - 1.3, 0.5])
         cube([10, 1.3, 2]);
 
         color("pink")
-        translate([79 - 7 -10, 13.6 - 1.3, 0.5])
+        translate([79 - 7 -10, 14.1 - 1.3, 0.5])
         cube([10, 1.3, 2]);
     }
 
