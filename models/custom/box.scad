@@ -308,9 +308,9 @@ module lid(_w, _d, _h, _t, _r) {
 }
 
 
-translate([_box_width +_thickness, - _thickness, 180])
-rotate([0, 180, 0])
-lid(_box_width, _box_depth, _box_height, _thickness, _box_radius);
+// translate([_box_width +_thickness, - _thickness, 180])
+// rotate([0, 180, 0])
+// lid(_box_width, _box_depth, _box_height, _thickness, _box_radius);
 box(_box_width, _box_depth, _box_height, _thickness, _box_radius);
 
 
