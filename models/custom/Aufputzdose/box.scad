@@ -1,14 +1,14 @@
-use <./../../modules/scad/roundedcube.scad>
+use <./../../../modules/scad/roundedcube.scad>
 
-_box_width = 140;
-_box_depth = 140;
-_box_height = 35;
+_box_width = 200;
+_box_depth = 98;
+_box_height = 40;
 _thickness = 3;
 _box_radius = 5;
 // Anzahl Löcher pro Segment und Wand: -1 = automatisch (so viele wie möglich), 0 = keine, 1-n = genau diese Anzahl
 // Untere Wand (y=0, entlang X):  _left = linkes Segment (kleine X), _right = rechtes Segment (große X)
 _num_holes_bottom_left  = 1;
-_num_holes_bottom_right = 2;
+_num_holes_bottom_right = 1;
 // Obere Wand (y=_d, entlang X):
 _num_holes_top_left  = 1;
 _num_holes_top_right = 1;
@@ -22,12 +22,23 @@ _hole_diameter = 16;  // Durchmesser der Kabeldurchführungs-Löcher in mm
 _hole_distance = 5;   // Mindestabstand zwischen zwei Löchern in mm
 
 // ---------------------------------------------------------------------------
-// Parameter für die 4 verstärkten Montagelöcher im Boden (Z-Richtung)
+// Parameter für die Montagelöcher
 // ---------------------------------------------------------------------------
+// Wo sollen die Montagelöcher hin?
+//   "floor"  = 4 Löcher im Boden (je _floor_hole_offset von den Ecken)
+//   "bottom" = Löcher in der unteren Wand (y=0, entlang X)
+//   "top"    = Löcher in der oberen Wand  (y=_d, entlang X)
+//   "left"   = Löcher in der linken Wand  (x=0, entlang Y)
+//   "right"  = Löcher in der rechten Wand (x=_w, entlang Y)
+//   "none"   = keine Montagelöcher
+_mount_location              = "bottom";
+_mount_hole_count            = 2;   // Anzahl Löcher bei Wandmontage (2 oder 3; bei "floor": immer 4)
 _floor_hole_diameter         = 5;   // Innendurchmesser des Lochs (z.B. 5 für M4-Schraube)
 _floor_hole_reinforce_diam   = 12;  // Außendurchmesser des Verstärkungsrings
 _floor_hole_reinforce_height = 2;   // Höhe des Verstärkungsrings über dem Boden (nach innen)
-_floor_hole_offset           = 25;  // Abstand der Loch-Mittelpunkte von den Ecken (X und Y)
+_floor_hole_offset           = 25;  // Abstand der Loch-Mittelpunkte von den Ecken/Rändern (X und Y)
+
+
 
 // nut holder radius (used for collision check)
 // Radius der Schmelzmuttern-Halter – wird für die Kollisionsprüfung genutzt
@@ -241,6 +252,46 @@ module floor_hole_cut(_t, _hole_d, _reinforce_h) {
     cylinder(h = _t + _reinforce_h + 2, d = _hole_d);
 }
 
+// ---------------------------------------------------------------------------
+// Hilfsfunktion: Positionen für Wandmontagelöcher.
+// Verteilt count Löcher gleichmäßig zwischen offset und wall_len - offset.
+// ---------------------------------------------------------------------------
+function _mount_wall_positions(wall_len, count, offset) =
+    count <= 0 ? [] :
+    count == 1 ? [wall_len / 2] :
+    let(step = (wall_len - 2 * offset) / (count - 1))
+    [for (i = [0 : count - 1]) offset + i * step];
+
+// Verstärkungsringe für Wandmontagelöcher (in union() addieren).
+// loc: "bottom" | "top" | "left" | "right"
+module wall_mount_boss(loc, _w, _d, _h, _t, _reinforce_d, _reinforce_h, positions) {
+    for (p = positions) {
+        if (loc == "bottom")
+            translate([p, _t,      _h / 2]) rotate([-90, 0,   0]) cylinder(h = _reinforce_h, d = _reinforce_d);
+        if (loc == "top")
+            translate([p, _d - _t, _h / 2]) rotate([ 90, 0,   0]) cylinder(h = _reinforce_h, d = _reinforce_d);
+        if (loc == "left")
+            translate([_t,      p, _h / 2]) rotate([  0, 90,  0]) cylinder(h = _reinforce_h, d = _reinforce_d);
+        if (loc == "right")
+            translate([_w - _t, p, _h / 2]) rotate([  0, -90, 0]) cylinder(h = _reinforce_h, d = _reinforce_d);
+    }
+}
+
+// Durchgangslöcher für Wandmontagelöcher (in difference() subtrahieren).
+// loc: "bottom" | "top" | "left" | "right"
+module wall_mount_cut(loc, _w, _d, _h, _t, _hole_d, _reinforce_h, positions) {
+    for (p = positions) {
+        if (loc == "bottom")
+            translate([p,      -1,      _h / 2]) rotate([-90, 0,   0]) cylinder(h = _t + _reinforce_h + 2, d = _hole_d);
+        if (loc == "top")
+            translate([p,      _d + 1,  _h / 2]) rotate([ 90, 0,   0]) cylinder(h = _t + _reinforce_h + 2, d = _hole_d);
+        if (loc == "left")
+            translate([-1,     p,       _h / 2]) rotate([  0, 90,  0]) cylinder(h = _t + _reinforce_h + 2, d = _hole_d);
+        if (loc == "right")
+            translate([_w + 1, p,       _h / 2]) rotate([  0, -90, 0]) cylinder(h = _t + _reinforce_h + 2, d = _hole_d);
+    }
+}
+
 module box(_w, _d, _h, _t, _r) {
     difference() {
 
@@ -261,12 +312,23 @@ module box(_w, _d, _h, _t, _r) {
                 translate([7, _d / 2, 0]) fusable_nuts_holder(_h); // l
             }
 
-            // Verstärkungsringe der 4 Bodenlöcher (nach innen ragend)
+            // Verstärkungsringe der Montagelöcher
             color("lightblue") {
-                translate([_floor_hole_offset,      _floor_hole_offset,      0]) floor_hole_boss(_t, _floor_hole_reinforce_diam, _floor_hole_reinforce_height); // vl
-                translate([_w - _floor_hole_offset, _floor_hole_offset,      0]) floor_hole_boss(_t, _floor_hole_reinforce_diam, _floor_hole_reinforce_height); // vr
-                translate([_w - _floor_hole_offset, _d - _floor_hole_offset, 0]) floor_hole_boss(_t, _floor_hole_reinforce_diam, _floor_hole_reinforce_height); // hr
-                translate([_floor_hole_offset,      _d - _floor_hole_offset, 0]) floor_hole_boss(_t, _floor_hole_reinforce_diam, _floor_hole_reinforce_height); // hl
+                if (_mount_location == "floor") {
+                    translate([_floor_hole_offset,      _floor_hole_offset,      0]) floor_hole_boss(_t, _floor_hole_reinforce_diam, _floor_hole_reinforce_height); // vl
+                    translate([_w - _floor_hole_offset, _floor_hole_offset,      0]) floor_hole_boss(_t, _floor_hole_reinforce_diam, _floor_hole_reinforce_height); // vr
+                    translate([_w - _floor_hole_offset, _d - _floor_hole_offset, 0]) floor_hole_boss(_t, _floor_hole_reinforce_diam, _floor_hole_reinforce_height); // hr
+                    translate([_floor_hole_offset,      _d - _floor_hole_offset, 0]) floor_hole_boss(_t, _floor_hole_reinforce_diam, _floor_hole_reinforce_height); // hl
+                } else if (_mount_location != "none") {
+                    wall_mount_boss(
+                        _mount_location, _w, _d, _h, _t,
+                        _floor_hole_reinforce_diam, _floor_hole_reinforce_height,
+                        _mount_wall_positions(
+                            (_mount_location == "bottom" || _mount_location == "top") ? _w : _d,
+                            _mount_hole_count, _floor_hole_offset
+                        )
+                    );
+                }
             }
         }
 
@@ -278,11 +340,22 @@ module box(_w, _d, _h, _t, _r) {
         wall_holes_left  (_w, _d, _h, _t, _num_holes_left_front,   _num_holes_left_back,    _hole_distance, _hole_diameter);
         wall_holes_right (_w, _d, _h, _t, _num_holes_right_front,  _num_holes_right_back,   _hole_distance, _hole_diameter);
 
-        // Durchgangslöcher der 4 verstärkten Bodenlöcher
-        translate([_floor_hole_offset,      _floor_hole_offset,      0]) floor_hole_cut(_t, _floor_hole_diameter, _floor_hole_reinforce_height); // vl
-        translate([_w - _floor_hole_offset, _floor_hole_offset,      0]) floor_hole_cut(_t, _floor_hole_diameter, _floor_hole_reinforce_height); // vr
-        translate([_w - _floor_hole_offset, _d - _floor_hole_offset, 0]) floor_hole_cut(_t, _floor_hole_diameter, _floor_hole_reinforce_height); // hr
-        translate([_floor_hole_offset,      _d - _floor_hole_offset, 0]) floor_hole_cut(_t, _floor_hole_diameter, _floor_hole_reinforce_height); // hl
+        // Durchgangslöcher der Montagelöcher
+        if (_mount_location == "floor") {
+            translate([_floor_hole_offset,      _floor_hole_offset,      0]) floor_hole_cut(_t, _floor_hole_diameter, _floor_hole_reinforce_height); // vl
+            translate([_w - _floor_hole_offset, _floor_hole_offset,      0]) floor_hole_cut(_t, _floor_hole_diameter, _floor_hole_reinforce_height); // vr
+            translate([_w - _floor_hole_offset, _d - _floor_hole_offset, 0]) floor_hole_cut(_t, _floor_hole_diameter, _floor_hole_reinforce_height); // hr
+            translate([_floor_hole_offset,      _d - _floor_hole_offset, 0]) floor_hole_cut(_t, _floor_hole_diameter, _floor_hole_reinforce_height); // hl
+        } else if (_mount_location != "none") {
+            wall_mount_cut(
+                _mount_location, _w, _d, _h, _t,
+                _floor_hole_diameter, _floor_hole_reinforce_height,
+                _mount_wall_positions(
+                    (_mount_location == "bottom" || _mount_location == "top") ? _w : _d,
+                    _mount_hole_count, _floor_hole_offset
+                )
+            );
+        }
     }
 }
 
@@ -309,8 +382,8 @@ module lid(_w, _d, _h, _t, _r) {
 
 
 // translate([_box_width +_thickness, - _thickness, 180])
-// rotate([0, 180, 0])
-// lid(_box_width, _box_depth, _box_height, _thickness, _box_radius);
+//rotate([0, 180, 0])
+//lid(_box_width, _box_depth, _box_height, _thickness, _box_radius);
 box(_box_width, _box_depth, _box_height, _thickness, _box_radius);
 
 
