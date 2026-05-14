@@ -1,8 +1,6 @@
 use <../../../../modules/scad/roundedcube.scad>
 use <./IKEA Skadis v3 Plate.scad>
 
-
-
 module bin(_w, _d, _h, _t, _r, _rh, _tp, _bpd) {
 
     // Set the backplate width

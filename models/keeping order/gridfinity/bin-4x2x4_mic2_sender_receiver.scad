@@ -23,15 +23,15 @@
 https://github.com/kennetek/gridfinity-rebuilt-openscad
 */
 
-include <../../../../gridfinity-rebuilt-openscad/src/core/standard.scad>
-use <../../../../gridfinity-rebuilt-openscad/src/core/gridfinity-rebuilt-utility.scad>
-use <../../../../gridfinity-rebuilt-openscad/src/core/gridfinity-rebuilt-holes.scad>
-use <../../../../gridfinity-rebuilt-openscad/src/core/bin.scad>
-use <../../../../gridfinity-rebuilt-openscad/src/core/cutouts.scad>
-use <../../../../gridfinity-rebuilt-openscad/src/helpers/generic-helpers.scad>
-use <../../../../gridfinity-rebuilt-openscad/src/helpers/grid.scad>
-use <../../../../gridfinity-rebuilt-openscad/src/helpers/grid_element.scad>
-use <../../../../gridfinity-rebuilt-openscad/src/helpers/generic-helpers.scad>
+include <../../../modules/gridfinity/src/core/standard.scad>
+use <../../../modules/gridfinity/src/core/gridfinity-rebuilt-utility.scad>
+use <../../../modules/gridfinity/src/core/gridfinity-rebuilt-holes.scad>
+use <../../../modules/gridfinity/src/core/bin.scad>
+use <../../../modules/gridfinity/src/core/cutouts.scad>
+use <../../../modules/gridfinity/src/helpers/generic-helpers.scad>
+use <../../../modules/gridfinity/src/helpers/grid.scad>
+use <../../../modules/gridfinity/src/helpers/grid_element.scad>
+use <../../../modules/gridfinity/src/helpers/generic-helpers.scad>
 
 // ===== PARAMETERS ===== //
 
@@ -43,9 +43,9 @@ $fs = 0.25; // .01
 // number of bases along x-axis
 gridx = 2;
 // number of bases along y-axis
-gridy = 2;
+gridy = 1;
 // bin height. See bin height information and "gridz_define" below.
-gridz = 12; //.1
+gridz = 5; //.1
 
 // Half grid sized bins.  Implies "only corners".
 half_grid = false;
@@ -54,7 +54,7 @@ half_grid = false;
 // How "gridz" is used to calculate height.  Some exclude 7mm/1U base, others exclude ~3.5mm (4.4mm nominal) stacking lip.
 gridz_define = 0; // [0:7mm increments - Excludes Stacking Lip, 1:Internal mm - Excludes Base & Stacking Lip, 2:External mm - Excludes Stacking Lip, 3:External mm]
 // Overrides internal block height of bin (for solid containers). Leave zero for default height. Units: mm
-height_internal = 3;
+height_internal = 15;
 // snap gridz height to nearest 7mm increment
 enable_zsnap = false;
 // If the top lip should exist.  Not included in height calculations.
@@ -62,9 +62,9 @@ include_lip = true;
 
 /* [Compartments] */
 // number of X Divisions (set to zero to have solid bin)
-divx = 1;
+divx = 0;
 // number of Y Divisions (set to zero to have solid bin)
-divy = 1;
+divy = 0;
 // Leave zero for default. Units: mm
 depth = 0;  //.1
 
@@ -82,7 +82,7 @@ style_tab = 5; //[0:Full,1:Auto,2:Left,3:Center,4:Right,5:None]
 // which divisions have tabs
 place_tab = 0; // [0:Everywhere-Normal,1:Top-Left Division]
 // scoop weight percentage. 0 disables scoop, 1 is regular scoop. Any real number will scale the scoop.
-scoop = 1; //[0:0.1:1]
+scoop = 0.0; //[0:0.1:1]
 
 /* [Base Hole Options] */
 // only cut magnet/screw holes at the corners of the bin to save uneccesary print time
@@ -106,38 +106,64 @@ hole_options = bundle_hole_options(refined_holes, magnet_holes, screw_holes, cru
 
 // ===== IMPLEMENTATION ===== //
 
-bin1 = new_bin(
-    grid_size = [gridx, gridy],
-    height_mm = height(gridz, gridz_define, enable_zsnap),
-    fill_height = height_internal,
-    include_lip = include_lip,
-    hole_options = hole_options,
-    only_corners = only_corners || half_grid,
-    thumbscrew = enable_thumbscrew,
-    grid_dimensions = GRID_DIMENSIONS_MM / (half_grid ? 2 : 1)
-);
+module gridbin() {
+    bin1 = new_bin(
+        grid_size = [gridx, gridy],
+        height_mm = height(gridz, gridz_define, enable_zsnap),
+        fill_height = height_internal,
+        include_lip = include_lip,
+        hole_options = hole_options,
+        only_corners = only_corners || half_grid,
+        thumbscrew = enable_thumbscrew,
+        grid_dimensions = GRID_DIMENSIONS_MM / (half_grid ? 2 : 1)
+    );
 
-echo(str(
-    "\n",
-    "Infill Dimensions*: ", bin_get_infill_size_mm(bin1), "\n",
-    "Bounding Box: ", bin_get_bounding_box(bin1), "\n",
-    "  *Excludes Stacking Lip Support Height (if stacking lip enabled)\n",
-));
-echo("Height breakdown:");
-pprint(bin_get_height_breakdown(bin1));
+    echo(str(
+        "\n",
+        "Infill Dimensions*: ", bin_get_infill_size_mm(bin1), "\n",
+        "Bounding Box: ", bin_get_bounding_box(bin1), "\n",
+        "  *Excludes Stacking Lip Support Height (if stacking lip enabled)\n",
+    ));
+    echo("Height breakdown:");
+    pprint(bin_get_height_breakdown(bin1));
 
-bin_render(bin1) {
-    bin_subdivide(bin1, [divx, divy]) {
-        depth_real = cgs(height=depth).z;
-        if (cut_cylinders) {
-            cut_chamfered_cylinder(cd/2, depth_real, c_chamfer);
-        } else {
-            cut_compartment_auto(
-                cgs(height=depth),
-                style_tab,
-                place_tab != 0,
-                scoop
-            );
+    bin_render(bin1) {
+        bin_subdivide(bin1, [divx, divy]) {
+            depth_real = cgs(height=depth).z;
+            if (cut_cylinders) {
+                cut_chamfered_cylinder(cd/2, depth_real, c_chamfer);
+            } else {
+                cut_compartment_auto(
+                    cgs(height=depth),
+                    style_tab,
+                    place_tab != 0,
+                    scoop
+                );
+            }
         }
     }
+}
+
+
+
+
+difference() {
+    gridbin();
+
+    // Extrude mic2_receiver SVG as cutout
+    color("red")
+    translate([15, 0, 8])
+    rotate([0, 0, 90])
+    linear_extrude(height = 20) {
+        import("mic2_receiver.svg", center = true);
+    }
+
+    // Extrude mic2_sender SVG as cutout
+    color("red")
+    translate([-24, 0, 8])
+    rotate([0, 0, 90])
+    linear_extrude(height = 20) {
+        import("mic2_sender.svg", center = true);
+    }
+
 }

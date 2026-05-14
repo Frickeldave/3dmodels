@@ -1,23 +1,23 @@
 use <./../../../modules/scad/roundedcube.scad>
 
-_box_width = 200;
-_box_depth = 98;
-_box_height = 40;
+_box_width = 100;
+_box_depth = 100;
+_box_height = 50;
 _thickness = 3;
 _box_radius = 5;
 // Anzahl Löcher pro Segment und Wand: -1 = automatisch (so viele wie möglich), 0 = keine, 1-n = genau diese Anzahl
 // Untere Wand (y=0, entlang X):  _left = linkes Segment (kleine X), _right = rechtes Segment (große X)
 _num_holes_bottom_left  = 1;
-_num_holes_bottom_right = 1;
+_num_holes_bottom_right = 0;
 // Obere Wand (y=_d, entlang X):
 _num_holes_top_left  = 1;
-_num_holes_top_right = 1;
+_num_holes_top_right = 0;
 // Linke Wand (x=0, entlang Y):   _front = vorderes Segment (kleine Y), _back = hinteres Segment (große Y)
 _num_holes_left_front = 1;
-_num_holes_left_back  = 1;
+_num_holes_left_back  = 0;
 // Rechte Wand (x=_w, entlang Y):
 _num_holes_right_front = 1;
-_num_holes_right_back  = 1;
+_num_holes_right_back  = 0;
 _hole_diameter = 16;  // Durchmesser der Kabeldurchführungs-Löcher in mm
 _hole_distance = 5;   // Mindestabstand zwischen zwei Löchern in mm
 
@@ -31,23 +31,50 @@ _hole_distance = 5;   // Mindestabstand zwischen zwei Löchern in mm
 //   "left"   = Löcher in der linken Wand  (x=0, entlang Y)
 //   "right"  = Löcher in der rechten Wand (x=_w, entlang Y)
 //   "none"   = keine Montagelöcher
-_mount_location              = "bottom";
+_mount_location              = "floor";
 _mount_hole_count            = 2;   // Anzahl Löcher bei Wandmontage (2 oder 3; bei "floor": immer 4)
 _floor_hole_diameter         = 5;   // Innendurchmesser des Lochs (z.B. 5 für M4-Schraube)
 _floor_hole_reinforce_diam   = 12;  // Außendurchmesser des Verstärkungsrings
 _floor_hole_reinforce_height = 2;   // Höhe des Verstärkungsrings über dem Boden (nach innen)
 _floor_hole_offset           = 25;  // Abstand der Loch-Mittelpunkte von den Ecken/Rändern (X und Y)
 
-
+// ---------------------------------------------------------------------------
+// Parameter für die Deckelbefestigung (Mittelstege)
+// ---------------------------------------------------------------------------
+// Anzahl der Mittelstege (Schmelzmuttern-Halter) pro Seite – ohne die 4 Eckpfosten
+//   0 = kein Mittelsteg (mehr Platz für Kabellöcher)
+//   1 = ein Steg in der Mitte
+//   N = N gleichmäßig verteilte Stege
+_lid_posts_front = 0;  // Vorderseite (y=0, entlang X)
+_lid_posts_back  = 0;  // Rückseite   (y=d, entlang X)
+_lid_posts_left  = 0;  // Linke Seite (x=0, entlang Y)
+_lid_posts_right = 0;  // Rechte Seite (x=w, entlang Y)
 
 // nut holder radius (used for collision check)
 // Radius der Schmelzmuttern-Halter – wird für die Kollisionsprüfung genutzt
 _nut_holder_r = 5;
 
-// Gesperrte Positionen entlang X (für untere/obere Wand): Ecken und Mitte
-_nut_x_positions = [7, _box_width / 2, _box_width - 7];
-// Gesperrte Positionen entlang Y (für linke/rechte Wand): Ecken und Mitte
-_nut_y_positions = [7, _box_depth / 2, _box_depth - 7];
+// ---------------------------------------------------------------------------
+// Hilfsfunktionen: Steg-Positionen und gesperrte Bereiche
+// ---------------------------------------------------------------------------
+// Gleichmäßig verteilte Positionen für Mittelstege zwischen den Eckpfosten
+// (Eckpfosten liegen immer bei 7 und wall_len-7)
+function _mid_post_pos(wall_len, count) =
+    count <= 0 ? [] :
+    count == 1 ? [wall_len / 2] :
+    let(step = (wall_len - 14) / (count + 1))
+    [for (i = [1 : count]) 7 + i * step];
+
+// Alle gesperrten Positionen einer Wand: Eckpfosten + Mittelstege
+function _blocked_pos(wall_len, count) =
+    let(mids = _mid_post_pos(wall_len, count))
+    concat([7], mids, [wall_len - 7]);
+
+// Gesperrte Positionen je Wand – automatisch aus _lid_posts_* berechnet
+_blocked_x_front = _blocked_pos(_box_width, _lid_posts_front);
+_blocked_x_back  = _blocked_pos(_box_width, _lid_posts_back);
+_blocked_y_left  = _blocked_pos(_box_depth, _lid_posts_left);
+_blocked_y_right = _blocked_pos(_box_depth, _lid_posts_right);
 
 // ---------------------------------------------------------------------------
 // Hilfsfunktion: Summiert alle Elemente eines Vektors (rekursiv)
@@ -77,6 +104,25 @@ function _free_segments(min_x, max_x, blocked, clear_gap) = [
 ];
 
 // ---------------------------------------------------------------------------
+// Hilfsfunktion: Aggregiert num_segs-Einträge ab Index 'from' aufsummiert.
+//
+// Wird benötigt, wenn weniger Segmente existieren als num_segs-Einträge vorhanden
+// sind (z.B. wegen fehlender Mittelstege). In diesem Fall werden die überschüssigen
+// Einträge zum letzten Segment addiert.
+//
+// Rückgabe:
+//   -1  → auto (kein Eintrag vorhanden, oder mindestens ein Eintrag ist -1)
+//   ≥0  → Summe aller Einträge ab 'from'
+// ---------------------------------------------------------------------------
+function _agg_num(v, i) =
+    i >= len(v) ? -1 :
+    v[i] < 0   ? -1 :
+    let(r = _agg_num(v, i + 1))
+    (r == -1 && i < len(v) - 1) ? -1 :  // mittlerer -1-Eintrag → auto
+    (r == -1)                   ? v[i] : // kein weiterer Eintrag → nur dieser Wert
+    v[i] + r;
+
+// ---------------------------------------------------------------------------
 // Hilfsfunktion: Maximale Anzahl Löcher die in ein Segment passen.
 // Berechnung: (Segmentbreite + Abstand) / (Durchmesser + Abstand)
 // ---------------------------------------------------------------------------
@@ -84,16 +130,21 @@ function _max_holes_in_seg(seg, hole_diam, hole_dist) =
     max(0, floor((seg[1] - seg[0] + hole_dist) / (hole_diam + hole_dist)));
 
 // ---------------------------------------------------------------------------
-// Hilfsfunktion: Platziert n Löcher gleichmäßig zentriert in einem Segment.
+// Hilfsfunktion: Platziert n Löcher gleichmäßig über das gesamte Segment verteilt.
 // Gibt eine Liste der Loch-Mittelpunkte zurück.
+//
+// Bei n=1: Loch mittig im Segment.
+// Bei n>1: erstes Loch am linken Rand (seg[0]+r), letztes am rechten Rand (seg[1]-r),
+//          dazwischen gleichmäßige Abstände – nutzt damit den vollen freien Bereich.
 // ---------------------------------------------------------------------------
 function _place_in_seg(seg, n, hole_diam, hole_dist) =
     n <= 0 ? [] :
+    n == 1 ? [(seg[0] + seg[1]) / 2] :
     let(
-        step = hole_diam + hole_dist,
-        total_span = n * hole_diam + (n - 1) * hole_dist,
-        center = (seg[0] + seg[1]) / 2,
-        start = center - total_span / 2 + hole_diam / 2
+        r     = hole_diam / 2,
+        start = seg[0] + r,
+        end   = seg[1] - r,
+        step  = (end - start) / (n - 1)
     )
     [for (i = [0 : n - 1]) start + i * step];
 
@@ -118,6 +169,11 @@ function _place_in_seg(seg, n, hole_diam, hole_dist) =
 //   t         – Wandstärke (_thickness)
 //
 // Rückgabe: Flache Liste aller Loch-Mittelpunkte (leer = keine Löcher)
+//
+// Segmentanzahl vs. num_segs-Länge:
+//   segs > num_segs  → überschüssige Segmente werden automatisch befüllt (-1)
+//   segs < num_segs  → überschüssige num_segs-Einträge werden zum letzten
+//                       Segment addiert, damit kein Wunsch "unter den Tisch fällt"
 // ---------------------------------------------------------------------------
 function calc_hole_positions(wall_len, num_segs, dist, hole_r, blocked, t) =
     let(
@@ -131,7 +187,11 @@ function calc_hole_positions(wall_len, num_segs, dist, hole_r, blocked, t) =
     len(segs) == 0 ? [] :
     [for (i = [0 : len(segs) - 1])
         let(
-            num   = (i < len(num_segs)) ? num_segs[i] : 0,
+            // Letztes Segment: alle verbleibenden num_segs-Einträge aggregieren
+            // Vorherige Segmente: direkt zugeordnet (oder -1 = auto wenn kein Eintrag)
+            num   = (i < len(segs) - 1)
+                        ? ((i < len(num_segs)) ? num_segs[i] : -1)
+                        : _agg_num(num_segs, i),
             max_n = _max_holes_in_seg(segs[i], hole_diam, dist),
             // Bei num > max_n ist Platzierung unmöglich → 0 Löcher (Warnung im Modul)
             n = (num == -1) ? max_n : ((num > max_n) ? 0 : num)
@@ -141,9 +201,9 @@ function calc_hole_positions(wall_len, num_segs, dist, hole_r, blocked, t) =
 
 // Löcher in der unteren Wand (entlang X, bei y=0)
 // num_left: Segment links (kleine X-Werte), num_right: Segment rechts (große X-Werte)
-module wall_holes_bottom(_w, _d, _h, _t, num_left, num_right, dist, diam) {
+module wall_holes_bottom(_w, _d, _h, _t, num_left, num_right, dist, diam, blocked) {
     hole_r = diam / 2;
-    positions = calc_hole_positions(_w, [num_left, num_right], dist, hole_r, _nut_x_positions, _t);
+    positions = calc_hole_positions(_w, [num_left, num_right], dist, hole_r, blocked, _t);
     // Warnung wenn eine feste Anzahl (> 0) nicht vollständig platziert werden konnte
     fixed = (num_left > 0 ? num_left : 0) + (num_right > 0 ? num_right : 0);
     if (fixed > 0 && len(positions) < fixed) {
@@ -158,9 +218,9 @@ module wall_holes_bottom(_w, _d, _h, _t, num_left, num_right, dist, diam) {
 
 // Löcher in der oberen Wand (entlang X, bei y=_d)
 // num_left: Segment links (kleine X-Werte), num_right: Segment rechts (große X-Werte)
-module wall_holes_top(_w, _d, _h, _t, num_left, num_right, dist, diam) {
+module wall_holes_top(_w, _d, _h, _t, num_left, num_right, dist, diam, blocked) {
     hole_r = diam / 2;
-    positions = calc_hole_positions(_w, [num_left, num_right], dist, hole_r, _nut_x_positions, _t);
+    positions = calc_hole_positions(_w, [num_left, num_right], dist, hole_r, blocked, _t);
     fixed = (num_left > 0 ? num_left : 0) + (num_right > 0 ? num_right : 0);
     if (fixed > 0 && len(positions) < fixed) {
         echo(str("INFO: Obere Wand – nicht alle Löcher platzierbar (gewünscht=", fixed, ", platziert=", len(positions), ", dist=", dist, ", diam=", diam, ")"));
@@ -174,9 +234,9 @@ module wall_holes_top(_w, _d, _h, _t, num_left, num_right, dist, diam) {
 
 // Löcher in der linken Wand (entlang Y, bei x=0)
 // num_front: Segment vorne (kleine Y-Werte, nahe untere Wand), num_back: Segment hinten (große Y-Werte)
-module wall_holes_left(_w, _d, _h, _t, num_front, num_back, dist, diam) {
+module wall_holes_left(_w, _d, _h, _t, num_front, num_back, dist, diam, blocked) {
     hole_r = diam / 2;
-    positions = calc_hole_positions(_d, [num_front, num_back], dist, hole_r, _nut_y_positions, _t);
+    positions = calc_hole_positions(_d, [num_front, num_back], dist, hole_r, blocked, _t);
     fixed = (num_front > 0 ? num_front : 0) + (num_back > 0 ? num_back : 0);
     if (fixed > 0 && len(positions) < fixed) {
         echo(str("INFO: Linke Wand – nicht alle Löcher platzierbar (gewünscht=", fixed, ", platziert=", len(positions), ", dist=", dist, ", diam=", diam, ")"));
@@ -190,9 +250,9 @@ module wall_holes_left(_w, _d, _h, _t, num_front, num_back, dist, diam) {
 
 // Löcher in der rechten Wand (entlang Y, bei x=_w)
 // num_front: Segment vorne (kleine Y-Werte, nahe untere Wand), num_back: Segment hinten (große Y-Werte)
-module wall_holes_right(_w, _d, _h, _t, num_front, num_back, dist, diam) {
+module wall_holes_right(_w, _d, _h, _t, num_front, num_back, dist, diam, blocked) {
     hole_r = diam / 2;
-    positions = calc_hole_positions(_d, [num_front, num_back], dist, hole_r, _nut_y_positions, _t);
+    positions = calc_hole_positions(_d, [num_front, num_back], dist, hole_r, blocked, _t);
     fixed = (num_front > 0 ? num_front : 0) + (num_back > 0 ? num_back : 0);
     if (fixed > 0 && len(positions) < fixed) {
         echo(str("INFO: Rechte Wand – nicht alle Löcher platzierbar (gewünscht=", fixed, ", platziert=", len(positions), ", dist=", dist, ", diam=", diam, ")"));
@@ -299,17 +359,24 @@ module box(_w, _d, _h, _t, _r) {
             box_base(_w, _d, _h, _t, _r);
 
             color("pink") {
-                // Fusable nuts holder in den 4 Ecken
-                translate([7, 7, 0]) fusable_nuts_holder(_h); // ul
-                translate([_w - 7, 7, 0]) fusable_nuts_holder(_h); // ur
-                translate([_w - 7, _d - 7, 0]) fusable_nuts_holder(_h); // or
-                translate([7, _box_depth - 7, 0]) fusable_nuts_holder(_box_height); // ol
+                // Eckpfosten (immer vorhanden)
+                translate([7,      7,      0]) fusable_nuts_holder(_h);
+                translate([_w - 7, 7,      0]) fusable_nuts_holder(_h);
+                translate([_w - 7, _d - 7, 0]) fusable_nuts_holder(_h);
+                translate([7,      _d - 7, 0]) fusable_nuts_holder(_h);
 
-                // Fusable nuts holder mittig an den 4 Seiten
-                translate([_w / 2, 7, 0]) fusable_nuts_holder(_h); // u
-                translate([_w - 7, _d / 2, 0]) fusable_nuts_holder(_h); // r
-                translate([_w / 2, _d - 7, 0]) fusable_nuts_holder(_h); // o
-                translate([7, _d / 2, 0]) fusable_nuts_holder(_h); // l
+                // Mittelstege Vorderseite (y=7)
+                for (x = _mid_post_pos(_w, _lid_posts_front))
+                    translate([x, 7, 0]) fusable_nuts_holder(_h);
+                // Mittelstege Rückseite (y=d-7)
+                for (x = _mid_post_pos(_w, _lid_posts_back))
+                    translate([x, _d - 7, 0]) fusable_nuts_holder(_h);
+                // Mittelstege Linke Seite (x=7)
+                for (y = _mid_post_pos(_d, _lid_posts_left))
+                    translate([7, y, 0]) fusable_nuts_holder(_h);
+                // Mittelstege Rechte Seite (x=w-7)
+                for (y = _mid_post_pos(_d, _lid_posts_right))
+                    translate([_w - 7, y, 0]) fusable_nuts_holder(_h);
             }
 
             // Verstärkungsringe der Montagelöcher
@@ -335,10 +402,10 @@ module box(_w, _d, _h, _t, _r) {
 
 
         // Holes in walls
-        wall_holes_bottom(_w, _d, _h, _t, _num_holes_bottom_left,  _num_holes_bottom_right, _hole_distance, _hole_diameter);
-        wall_holes_top   (_w, _d, _h, _t, _num_holes_top_left,     _num_holes_top_right,    _hole_distance, _hole_diameter);
-        wall_holes_left  (_w, _d, _h, _t, _num_holes_left_front,   _num_holes_left_back,    _hole_distance, _hole_diameter);
-        wall_holes_right (_w, _d, _h, _t, _num_holes_right_front,  _num_holes_right_back,   _hole_distance, _hole_diameter);
+        wall_holes_bottom(_w, _d, _h, _t, _num_holes_bottom_left,  _num_holes_bottom_right, _hole_distance, _hole_diameter, _blocked_x_front);
+        wall_holes_top   (_w, _d, _h, _t, _num_holes_top_left,     _num_holes_top_right,    _hole_distance, _hole_diameter, _blocked_x_back);
+        wall_holes_left  (_w, _d, _h, _t, _num_holes_left_front,   _num_holes_left_back,    _hole_distance, _hole_diameter, _blocked_y_left);
+        wall_holes_right (_w, _d, _h, _t, _num_holes_right_front,  _num_holes_right_back,   _hole_distance, _hole_diameter, _blocked_y_right);
 
         // Durchgangslöcher der Montagelöcher
         if (_mount_location == "floor") {
@@ -364,26 +431,32 @@ module lid(_w, _d, _h, _t, _r) {
     difference() {
         lid_base(_w, _d, _h, _t, _r);
 
-        // Srew holes in corners
-        color("Red")
-        translate([_thickness + 7, _thickness + 7, -10]) cylinder(h = _t + 20, r = 2.5); // ul
-        translate([_w - 7 + _thickness, _thickness + 7, -10]) cylinder(h = _t + 20, r = 2.5); // ur
-        translate([_w - 7 + _thickness, _d - 7 + _thickness, -10]) cylinder(h = _t + 20, r = 2.5); // or
-        translate([7 + _thickness, _box_depth - 7 + _thickness, -10]) cylinder(h = _t + 20, r = 2.5); // ol
+        // Eckschrauben (immer vorhanden)
+        translate([7 + _t,      7 + _t,      -10]) cylinder(h = _t + 20, r = 2.5); // ul
+        translate([_w - 7 + _t, 7 + _t,      -10]) cylinder(h = _t + 20, r = 2.5); // ur
+        translate([_w - 7 + _t, _d - 7 + _t, -10]) cylinder(h = _t + 20, r = 2.5); // or
+        translate([7 + _t,      _d - 7 + _t, -10]) cylinder(h = _t + 20, r = 2.5); // ol
 
-        // Screw holes at the sides
-        translate([_w / 2 + _thickness, 7 + _thickness, -10]) cylinder(h = _t + 20, r = 2.5); // u
-        translate([_w - 7 + _thickness, _d / 2 + _thickness, -10]) cylinder(h = _t + 20, r = 2.5); // r
-        translate([_w / 2 + _thickness, _d - 7 + _thickness, -10]) cylinder(h = _t + 20, r = 2.5); // o
-        translate([7 + _thickness, _d / 2 + _thickness, -10]) cylinder(h = _t + 20, r = 2.5); // l
+        // Mittelstege Vorderseite
+        for (x = _mid_post_pos(_w, _lid_posts_front))
+            translate([x + _t, 7 + _t, -10]) cylinder(h = _t + 20, r = 2.5);
+        // Mittelstege Rückseite
+        for (x = _mid_post_pos(_w, _lid_posts_back))
+            translate([x + _t, _d - 7 + _t, -10]) cylinder(h = _t + 20, r = 2.5);
+        // Mittelstege Linke Seite
+        for (y = _mid_post_pos(_d, _lid_posts_left))
+            translate([7 + _t, y + _t, -10]) cylinder(h = _t + 20, r = 2.5);
+        // Mittelstege Rechte Seite
+        for (y = _mid_post_pos(_d, _lid_posts_right))
+            translate([_w - 7 + _t, y + _t, -10]) cylinder(h = _t + 20, r = 2.5);
 
     }
 }
 
 
-// translate([_box_width +_thickness, - _thickness, 180])
-//rotate([0, 180, 0])
-//lid(_box_width, _box_depth, _box_height, _thickness, _box_radius);
-box(_box_width, _box_depth, _box_height, _thickness, _box_radius);
+translate([_box_width +_thickness, - _thickness, 60])
+rotate([0, 180, 0])
+lid(_box_width, _box_depth, _box_height, _thickness, _box_radius);
+//box(_box_width, _box_depth, _box_height, _thickness, _box_radius);
 
 
