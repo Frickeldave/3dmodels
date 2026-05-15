@@ -4,6 +4,7 @@ $fn = 50;
 
 _size = 60;
 _rod_dia = 9;
+_rod_endcap_dia = 8;
 _height = 7;
 _round = 3; // corner rounding radius
 _wall  = 5; // wall thickness for hollow cutout
@@ -71,17 +72,17 @@ module rod_holder() {
 
 module rod_endcaps() {
 
-        color("lightblue")
+        color("lightgreen")
         translate([0,0,0])
-        cylinder(h = 2, d = _rod_dia + 4, center = false);    
+        cylinder(h = 2, d = _rod_endcap_dia + 4, center = false);    
     
     difference() {
 
         color("lightblue")
         translate([0,0,0])
-        cylinder(h = 5, d = _rod_dia + 2, center = false);
+        cylinder(h = 8, d = _rod_endcap_dia + 2, center = false);
         translate([0,0,2])
-        cylinder(h = 4, d = _rod_dia, center = false);
+        cylinder(h = 11, d = _rod_endcap_dia, center = false);
     }
 }
 
