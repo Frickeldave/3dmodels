@@ -43,9 +43,9 @@ $fs = 0.25; // .01
 // number of bases along x-axis
 gridx = 1;
 // number of bases along y-axis
-gridy = 5;
+gridy = 1;
 // bin height. See bin height information and "gridz_define" below.
-gridz = 12; //.1
+gridz = 3; //.1
 
 // Half grid sized bins.  Implies "only corners".
 half_grid = false;
@@ -54,11 +54,11 @@ half_grid = false;
 // How "gridz" is used to calculate height.  Some exclude 7mm/1U base, others exclude ~3.5mm (4.4mm nominal) stacking lip.
 gridz_define = 0; // [0:7mm increments - Excludes Stacking Lip, 1:Internal mm - Excludes Base & Stacking Lip, 2:External mm - Excludes Stacking Lip, 3:External mm]
 // Overrides internal block height of bin (for solid containers). Leave zero for default height. Units: mm
-height_internal = 0;
+height_internal = 10;
 // snap gridz height to nearest 7mm increment
 enable_zsnap = false;
 // If the top lip should exist.  Not included in height calculations.
-include_lip = true;
+include_lip = false;
 
 /* [Compartments] */
 // number of X Divisions (set to zero to have solid bin)
@@ -77,6 +77,24 @@ divider_x_thickness = 1.2; // .05
 divider_y_count = 0; // [0:1:12]
 // thickness of Y-direction walls. Units: mm
 divider_y_thickness = 1.2; // .05
+
+/* [Solid Fill Holes] */
+// Cut holes into the solid fill
+cut_fill_holes = true;
+// Shape of the holes: 0=round, 1=hexagon (for bits)
+fill_hole_shape = 1; // [0:Round, 1:Hexagon]
+// Diameter of round holes in mm
+fill_hole_diameter = 4; // .1
+// Flat-to-flat width of hexagon holes in mm (1/4" bit = 6.35mm)
+fill_hex_width = 8; // .1
+// Number of holes in X direction
+fill_holes_x = 3; // [1:20]
+// Number of holes in Y direction
+fill_holes_y = 3; // [1:20]
+// Depth of holes in mm (0 = full depth)
+fill_hole_depth = 0; // .1
+// Chamfer around top rim of holes
+fill_hole_chamfer = 0.9; // .1
 
 /* [Cylindrical Compartments] */
 // Use this instead of bins
@@ -171,6 +189,40 @@ module cut_compartment_fixed_dividers(
     }
 }
 
+module cut_fill_holes_grid(size_mm, hole_d, hex_width, holes_x, holes_y, hole_depth, chamfer, shape) {
+    depth_real = hole_depth > 0 ? hole_depth : size_mm.z;
+    step_x = size_mm.x / holes_x;
+    step_y = size_mm.y / holes_y;
+    for (ix = [0:holes_x-1])
+        for (iy = [0:holes_y-1])
+            translate([
+                -size_mm.x/2 + step_x * (ix + 0.5),
+                -size_mm.y/2 + step_y * (iy + 0.5),
+                0
+            ])
+            if (shape == 1) {
+                // Hexagon (flat-to-flat = hex_width), rotated 90° so flat side faces up
+                rotate([0, 0, 90])
+                translate([0, 0, -depth_real])
+                union() {
+                    linear_extrude(depth_real)
+                        circle(d=hex_width, $fn=6);
+                    if (chamfer > 0)
+                        // Chamfer: hull between hex at top (slightly larger) and hex at chamfer depth
+                        hull() {
+                            translate([0, 0, depth_real])
+                            linear_extrude(0.01)
+                                circle(d=hex_width + 2*chamfer, $fn=6);
+                            translate([0, 0, depth_real - chamfer])
+                            linear_extrude(0.01)
+                                circle(d=hex_width, $fn=6);
+                        }
+                }
+            } else {
+                cut_chamfered_cylinder(hole_d / 2, depth_real, chamfer);
+            }
+}
+
 // ===== IMPLEMENTATION ===== //
 
 module gridbin() {
@@ -195,28 +247,42 @@ module gridbin() {
     pprint(bin_get_height_breakdown(bin1));
 
     bin_render(bin1) {
-        bin_subdivide(bin1, [divx, divy]) {
-            compartment_size = cgs(height=depth);
-            depth_real = compartment_size.z;
-            if (cut_cylinders) {
-                cut_chamfered_cylinder(cd/2, depth_real, c_chamfer);
-            } else {
-                if (divider_x_count > 0 || divider_y_count > 0) {
-                    cut_compartment_fixed_dividers(
-                        compartment_size,
-                        divider_x_count,
-                        divider_x_thickness,
-                        divider_y_count,
-                        divider_y_thickness,
-                        scoop
-                    );
+        if (cut_fill_holes) {
+            infill = bin_get_infill_size_mm(bin1);
+            cut_fill_holes_grid(
+                infill,
+                fill_hole_diameter,
+                fill_hex_width,
+                fill_holes_x,
+                fill_holes_y,
+                fill_hole_depth,
+                fill_hole_chamfer,
+                fill_hole_shape
+            );
+        } else {
+            bin_subdivide(bin1, [divx, divy]) {
+                compartment_size = cgs(height=depth);
+                depth_real = compartment_size.z;
+                if (cut_cylinders) {
+                    cut_chamfered_cylinder(cd/2, depth_real, c_chamfer);
                 } else {
-                    cut_compartment_auto(
-                        compartment_size,
-                        style_tab,
-                        place_tab != 0,
-                        scoop
-                    );
+                    if (divider_x_count > 0 || divider_y_count > 0) {
+                        cut_compartment_fixed_dividers(
+                            compartment_size,
+                            divider_x_count,
+                            divider_x_thickness,
+                            divider_y_count,
+                            divider_y_thickness,
+                            scoop
+                        );
+                    } else {
+                        cut_compartment_auto(
+                            compartment_size,
+                            style_tab,
+                            place_tab != 0,
+                            scoop
+                        );
+                    }
                 }
             }
         }
@@ -224,3 +290,5 @@ module gridbin() {
 }
 
 gridbin();
+
+

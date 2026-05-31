@@ -69,8 +69,8 @@ hole_options = bundle_hole_options(refined_hole=false, magnet_hole=enable_magnet
 
 // ===== IMPLEMENTATION ===== //
 
-color("tomato")
-gridfinityBaseplate([gridx, gridy], l_grid, [distancex, distancey], style_plate, hole_options, style_hole, [fitx, fity]);
+// color("tomato")
+// gridfinityBaseplate([gridx, gridy], l_grid, [distancex, distancey], style_plate, hole_options, style_hole, [fitx, fity]);
 
 // ===== CONSTRUCTION ===== //
 

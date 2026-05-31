@@ -64,7 +64,7 @@ connector_plate_outer_screws           = false; // Schraubenlocher in der Platte
 // Magnete in den Anschlussplatten (eingelassen in die Oberseite, um die Oeffnung herum)
 connector_plate_inner_magnets          = true;  // Magnete in der Platte des Innenteils einlassen
 connector_plate_outer_magnets          = true;  // Magnete in der Platte des Aussenteils einlassen
-connector_plate_magnet_diameter        = 20;    // Durchmesser der Magnete
+connector_plate_magnet_diameter        = 20.2;    // Durchmesser der Magnete
 connector_plate_magnet_thickness       = 3;     // Dicke der Magnete (Tiefe der Ausnehmung)
 connector_plate_magnet_count           = 8;     // Anzahl der Magnete
 connector_plate_magnet_circle_diameter = 130;  // Durchmesser des Kreises, auf dem die Magnete angeordnet sind
@@ -83,14 +83,40 @@ connector_plate_foam_hole_circle_diameter   = 115;  // Bohrkreis-Durchmesser (ig
 
 // Zentrierring (unabhaengiges Teil)
 // Liegt um das Aussenrohr und zentriert es gleichmaessig in der Wandbohrung.
-// Der Zwischenraum zwischen Ring und Wandbohrung / Ring und Rohr wird mit Brunnenschaum ausgefuellt.
 centering_ring_height           = 5;    // Hoehe (axiale Laenge) des Zentrierrings
 centering_ring_inner_clearance  = 0.2;  // Radiales Spiel zwischen Ringinnenseite und Rohraussen
-centering_ring_outer_clearance  = 0.2;  // Radiales Spiel zwischen Ringaussenseite und Wandbohrung
+centering_ring_outer_clearance  = 0.2;  // Radiales Spiel between Ringaussenseite und Wandbohrung
 centering_ring_chamfer          = 1.5;  // Fase an beiden Stirnkanten des Rings (Einfuehrhilfe)
 centering_ring_notch_count      = 8;    // Anzahl der elliptischen Ausschnitte ("Bluetenblaetter")
 centering_ring_notch_width      = 50;   // Tangentiale Breite jedes Ausschnitts an der Aussenkante
 centering_ring_notch_depth      = 12;   // Radiale Tiefe des Ausschnitts (wie weit er in den Ring hineinschneidet)
+
+// Anschlussstutzen mit Magnetrings (unabhaengiges Teil)
+// Kreisring mit Magnetausnehmungen auf einer Seite, Gegenseite mit hohlem Anschlussstutzen.
+// Die Bohrungen im Ring und Stutzen sind gleich gross fuer durchgaengigen Luftstrom.
+exhaust_hose_connector_ring_height          = 5;    // Hoehe des Ringkörpers
+exhaust_hose_connector_outer_diameter       = 150;  // Mittlerer Aussendurchmesser des Rings
+
+// Wellige Aussenkante des Rings (an Magnetpositionen nach aussen gewölbt, dazwischen eingezogen)
+exhaust_hose_connector_wave_depth           = 10;    // Maximale radiale Auswölbung an den Magnetpositionen
+exhaust_hose_connector_wave_count           = 8;    // Anzahl der Wellen (entspricht Magnetanzahl)
+
+// Magnetloecher auf der Oberseite (negative Z-Seite)
+exhaust_hose_connector_magnet_count        = 8;     // Anzahl der Magnete
+exhaust_hose_connector_magnet_diameter     = 20.1;    // Durchmesser der Magnete
+exhaust_hose_connector_magnet_thickness    = 3;     // Tiefe der Ausnehmung
+exhaust_hose_connector_magnet_circle_diameter = 130; // Durchmesser des Kreises fuer die Magnete
+
+// Anschlussstutzen auf der der Magnetgegensetzten Seite (positive Z-Seite), hohler Zylinder
+// Der Stutzen und die Ringbohrung haben identischen Durchmesser fuer durchgaengigen Luftstrom.
+exhaust_hose_connector_dia         = 90;    // Durchmesser des Stutzens UND der Ringbohrung
+exhaust_hose_connector_thickness   = 4;     // Wandstaerke des Stutzens
+exhaust_hose_connector_stub_height = 60;    // Axiale Hoehe des Stutzens (ueber den Ring hinaus)
+
+// 90-Grad-Bogen-Variante: Parameter fuer den Rohrbogen
+exhaust_hose_connector_bend_radius = 80;    // Biegeradius (Mitte des Rohrquerschnitts zur Bogenachse)
+exhaust_hose_connector_bend_entry  = 0;    // Laenge des geraden Abschnitts VOR dem Bogen (Einlauf)
+exhaust_hose_connector_bend_straight = 60;  // Laenge des geraden Abschnitts nach dem Bogen (Auslauf)
 
 // --- Module ---
 
@@ -351,17 +377,313 @@ module wall_bushing_outer() {
     }
 }
 
+// Anschlussstutzen mit Magnetrings
+// Kreisring mit Magnetausnehmungen auf der negativen Z-Seite,
+// und einem hohlen Zylinder-Anschlussstutzen auf der positiven Z-Seite.
+module exhaust_hose_connector() {
+    r = exhaust_hose_connector_dia / 2;
+    outer_r = exhaust_hose_connector_outer_diameter / 2;
+    stub_r = r + exhaust_hose_connector_thickness;
+    half_ring_h = exhaust_hose_connector_ring_height / 2;
+
+    assert(outer_r > r,
+        "exhaust_hose_connector: Aussenradius muss groesser als Bohrungsradius sein");
+    assert(stub_r <= outer_r,
+        "exhaust_hose_connector: Anschlussstutzen ragt ausserhalb des Rings");
+    assert(exhaust_hose_connector_dia > 0,
+        "exhaust_hose_connector: Durchmesser muss groesser 0 sein");
+
+    // Magnetparameter-Pruefung
+    assert(exhaust_hose_connector_magnet_count > 0, "exhaust_hose_connector_magnet_count muss groesser 0 sein");
+    assert(exhaust_hose_connector_magnet_diameter > 0, "exhaust_hose_connector_magnet_diameter muss groesser 0 sein");
+    assert(exhaust_hose_connector_magnet_thickness <= exhaust_hose_connector_ring_height,
+        "exhaust_hose_connector_magnet_thickness darf nicht groesser als Ringhoehe sein");
+    assert(exhaust_hose_connector_magnet_circle_diameter / 2 + exhaust_hose_connector_magnet_diameter / 2
+               <= outer_r + exhaust_hose_connector_wave_depth / 2,
+        "Magnete liegen ausserhalb des Rings (auch mit Wellenauswoelbung)");
+    assert(exhaust_hose_connector_magnet_circle_diameter / 2 - exhaust_hose_connector_magnet_diameter / 2 >= r,
+        "Magnete ueberschneiden sich mit der Zentralbohrung");
+
+    // Wellige Außenkontur: Außenradius variiert sinusförmig zwischen
+    // (outer_r - wave_depth/2) und (outer_r + wave_depth/2).
+    // Maxima liegen an Magnetpositionen, Minima dazwischen.
+    wave_steps = exhaust_hose_connector_wave_count * 32; // Segmente fuer glatte Kurve
+    wave_depth = exhaust_hose_connector_wave_depth;
+    wave_count = exhaust_hose_connector_wave_count;
+
+    // 2D-Profil des welligen Rings (XY-Ebene), wird dann linear_extrude'd.
+    // Zwei separate paths verhindern den Schlitz, der bei einer einfachen
+    // concat()-Punktliste zwischen letztem Aussen- und erstem Innenpunkt entsteht.
+    module wavy_ring_2d() {
+        pts_outer = [for (i = [0 : wave_steps - 1])
+            let(
+                angle = i * 360 / wave_steps,
+                wave_r = outer_r + (wave_depth / 2) * cos(angle * wave_count)
+            )
+            [wave_r * cos(angle), wave_r * sin(angle)]
+        ];
+        pts_inner = [for (i = [0 : wave_steps - 1])
+            let(angle = i * 360 / wave_steps)
+            [r * cos(angle), r * sin(angle)]
+        ];
+        polygon(
+            points = concat(pts_outer, pts_inner),
+            paths  = [
+                [for (i = [0 : wave_steps - 1]) i],
+                [for (i = [0 : wave_steps - 1]) wave_steps + i]
+            ]
+        );
+    }
+
+    difference() {
+        union() {
+            // Ringkörper mit welliger Aussenkante
+            linear_extrude(height=exhaust_hose_connector_ring_height)
+            wavy_ring_2d();
+
+            // Anschlussstutzen auf der positiven Z-Seite (demagnets abgewandte Seite)
+            cylinder(h=exhaust_hose_connector_stub_height, d=stub_r * 2);
+        }
+
+        // Zentrale Bohrung durch den Ring (1mm tiefer zum Boden hin zur Vermeidung von OpenSCAD-Artefakten)
+        translate([0, 0, -1])
+        cylinder(h=exhaust_hose_connector_ring_height + 2 * eps + 1, d=exhaust_hose_connector_dia);
+
+        // Magnetloecher auf der negativen Z-Seite
+        for (i = [0 : exhaust_hose_connector_magnet_count - 1])
+            rotate([0, 0, i * 360 / exhaust_hose_connector_magnet_count])
+            translate([exhaust_hose_connector_magnet_circle_diameter / 2, 0, -eps])
+            cylinder(h=exhaust_hose_connector_magnet_thickness + eps, d=exhaust_hose_connector_magnet_diameter);
+
+        // Innendurchlass des Stutzens
+        cylinder(h=exhaust_hose_connector_stub_height + exhaust_hose_connector_ring_height + 2 * eps, d=exhaust_hose_connector_dia);
+    }
+}
+
+// Anschlussstutzen mit Magnetring und 90-Grad-Bogen.
+// Identisch zu exhaust_hose_connector, aber anstelle des geraden Stutzens
+// wird ein 90°-Rohrbogen angesetzt, der den Luftstrom um 90° umlenkt.
+// Am Ende des Bogens folgt ein kurzer gerader Auslauf (exhaust_hose_connector_bend_straight).
+// Der Bogen beginnt an der Oberkante des Ringkoerpers und biegt in positive X-Richtung ab.
+module exhaust_hose_connector_90_degree() {
+    r_inner = exhaust_hose_connector_dia / 2;
+    r_outer = r_inner + exhaust_hose_connector_thickness;
+    bend_r  = exhaust_hose_connector_bend_radius;
+    ring_h  = exhaust_hose_connector_ring_height;
+    entry_len    = exhaust_hose_connector_bend_entry;
+    straight_len = exhaust_hose_connector_bend_straight;
+
+    assert(bend_r > r_outer,
+        "exhaust_hose_connector_bend_radius muss groesser als der Stutzen-Aussenradius sein");
+
+    // Ringkoerper mit Magneten aus dem Basismodul wiederverwenden:
+    // Wir bauen den Ring und die Magnete identisch zu exhaust_hose_connector,
+    // aber ersetzen den geraden Stutzen durch den 90°-Bogen.
+
+    outer_r = exhaust_hose_connector_outer_diameter / 2;
+    stub_r  = r_outer;
+    wave_steps = exhaust_hose_connector_wave_count * 32;
+    wave_depth = exhaust_hose_connector_wave_depth;
+    wave_count = exhaust_hose_connector_wave_count;
+
+    // 2D-Profil des welligen Rings (identisch zum Basismodul)
+    module wavy_ring_2d() {
+        pts_outer = [for (i = [0 : wave_steps - 1])
+            let(
+                angle = i * 360 / wave_steps,
+                wave_r = outer_r + (wave_depth / 2) * cos(angle * wave_count)
+            )
+            [wave_r * cos(angle), wave_r * sin(angle)]
+        ];
+        pts_inner = [for (i = [0 : wave_steps - 1])
+            let(angle = i * 360 / wave_steps)
+            [r_inner * cos(angle), r_inner * sin(angle)]
+        ];
+        polygon(
+            points = concat(pts_outer, pts_inner),
+            paths  = [
+                [for (i = [0 : wave_steps - 1]) i],
+                [for (i = [0 : wave_steps - 1]) wave_steps + i]
+            ]
+        );
+    }
+
+    // Geometrie des 90°-Bogens:
+    // rotate_extrude(angle=90) dreht ein 2D-Profil um die Z-Achse.
+    // Profil bei x=bend_r → Torusmittelpunkt auf Z-Achse, Rohrquerschnitt im Abstand bend_r.
+    //
+    // Rohes Ergebnis (vor Transformation):
+    //   Bogenstart (Winkel  0°): Profilmitte bei ( bend_r,      0, 0), Tangente zeigt in +Y.
+    //   Bogenende  (Winkel 90°): Profilmitte bei (      0,  bend_r, 0), Tangente zeigt in -X.
+    //
+    // Gewuenschtes Ergebnis:
+    //   Bogenstart: Profilmitte bei (0, 0, ring_h), Tangente zeigt in +Z  → setzt an Ringoberkante an.
+    //   Bogenende:  Profilmitte bei (0, 0, ring_h + bend_r), Tangente zeigt in -X (Ausgang seitlich).
+    //   Bogen liegt in der YZ-Ebene, biegt von oben nach links (-X).
+    //
+    // Transformationskette (OpenSCAD liest von innen nach aussen):
+    //   1. translate([bend_r, 0])            → Profil auf Abstand bend_r von Z-Achse.
+    //   2. rotate_extrude(angle=90)          → Bogen in XY-Ebene (Start bei +X, Ende bei +Y).
+    //   3. rotate([90, 0, 0])                → kippt XY→XZ: Start (bend_r,0,0)→(bend_r,0,0),
+    //                                          Ende (0,bend_r,0)→(0,0,bend_r). Tangenten kippen mit.
+    //                                          Start-Tangente: war +Y, wird +Z.  ✓
+    //                                          Ende-Tangente:  war -X, bleibt -X. ✓
+    //   4. translate([0, 0, ring_h])         → Bogenstart auf Z=ring_h (Ringoberkante).
+    //      Start: (bend_r, 0, ring_h).  ← Noch nicht auf Z-Achse!
+    //   5. translate([-bend_r, 0, 0])        → Verschiebt Start auf Z-Achse.
+    //      Start: (0, 0, ring_h).  ✓
+    //      Ende:  (-bend_r, 0, ring_h + bend_r). → Ausgang zeigt in -X. ✓
+    //
+    // Kurzform: translate([-bend_r, 0, ring_h+entry_len]) rotate([90,0,0]) rotate_extrude(angle=90) translate([bend_r,0]) ...
+    //
+    // Gerader Einlauf: auf Z-Achse von Z=ring_h bis Z=ring_h+entry_len.
+    // Gerader Auslauf: bei (-bend_r, 0, ring_h+entry_len+bend_r), zeigt in -X.
+
+    difference() {
+        union() {
+            // Ringkoerper mit welliger Aussenkante (identisch zum Basismodul)
+            linear_extrude(height=ring_h)
+            wavy_ring_2d();
+
+            // Gerader Einlauf vor dem Bogen, auf der Z-Achse zentriert.
+            // Verbindet Ringoberkante (Z=ring_h) mit dem Bogeneintritt (Z=ring_h+entry_len).
+            if (entry_len > 0)
+                translate([0, 0, ring_h])
+                cylinder(h=entry_len, r=r_outer);
+
+            // 90-Grad-Bogen (Torusabschnitt), setzt am Ende des Einlaufs an.
+            // Eingang: zentriert auf Z-Achse bei Z=ring_h+entry_len, Rohr zeigt +Z.
+            // Ausgang: bei (-bend_r, 0, ring_h+entry_len+bend_r), Rohr zeigt -X.
+            translate([-bend_r, 0, ring_h + entry_len])
+            rotate([90, 0, 0])
+            rotate_extrude(angle=90)
+            translate([bend_r, 0, 0])
+            circle(r=r_outer);
+
+            // Gerader Auslauf am Bogenende, zeigt in -X-Richtung.
+            translate([-bend_r, 0, ring_h + entry_len + bend_r])
+            rotate([0, -90, 0])
+            cylinder(h=straight_len, r=r_outer);
+        }
+
+        // Magnetloecher auf der negativen Z-Seite (identisch zum Basismodul)
+        for (i = [0 : exhaust_hose_connector_magnet_count - 1])
+            rotate([0, 0, i * 360 / exhaust_hose_connector_magnet_count])
+            translate([exhaust_hose_connector_magnet_circle_diameter / 2, 0, -eps])
+            cylinder(h=exhaust_hose_connector_magnet_thickness + eps, d=exhaust_hose_connector_magnet_diameter);
+
+        // Innenbohrung durch Ringkoerper und geraden Einlauf
+        translate([0, 0, -1])
+        cylinder(h=ring_h + entry_len + 1 + eps, r=r_inner);
+
+        // Innenbohrung des 90°-Bogens (gleiche Transformation, nur r_inner)
+        translate([-bend_r, 0, ring_h + entry_len])
+        rotate([90, 0, 0])
+        rotate_extrude(angle=90)
+        translate([bend_r, 0, 0])
+        circle(r=r_inner);
+
+        // Innenbohrung des geraden Auslaufs
+        translate([-bend_r, 0, ring_h + entry_len + bend_r])
+        rotate([0, -90, 0])
+        cylinder(h=straight_len + eps, r=r_inner);
+    }
+}
+
+module exhaust_hose_connector_kg_adapter() {
+
+    _parts_thickness = wall_bushing_thickness / 2;
+    _parts_height = 40;
+    _chamfer = 4; // Fasengroesse (radial und axial)
+
+    difference() {
+        union() {
+            // Fase unten: Aussendurchmesser wächst von (dia - 2*chamfer) auf dia
+            cylinder(d1 = exhaust_hose_connector_dia - 2 * _chamfer, d2 = exhaust_hose_connector_dia, h = _chamfer);
+            translate([0, 0, _chamfer])
+            cylinder(d = exhaust_hose_connector_dia, h = _parts_height - _chamfer);
+            translate([0, 0, _parts_height])
+            cylinder(d1 = exhaust_hose_connector_dia, d2 = 110, h = _parts_height);
+            // Oberer Zylinder mit Fase oben: Aussendurchmesser läuft von 110 auf (110 - 2*chamfer)
+            translate([0, 0, 2 * _parts_height])
+            cylinder(d = 110, h = _parts_height - _chamfer);
+            translate([0, 0, 3 * _parts_height - _chamfer])
+            cylinder(d1 = 110, d2 = 110 - 2 * _chamfer, h = _chamfer);
+        }
+        union() {
+            translate([0, 0, -1])
+            cylinder(d = exhaust_hose_connector_dia - _parts_thickness * 2, h = _parts_height + 2);
+            translate([0, 0, _parts_height - 1])
+            cylinder(d1 = exhaust_hose_connector_dia - _parts_thickness * 2, d2 = 110 - _parts_thickness * 2, h = _parts_height + 2);
+            translate([0, 0, 2 * _parts_height - 1])
+            cylinder(d = 110 - _parts_thickness * 2, h = _parts_height + 2);
+        }
+    }
+}
+
+module wall_bushing_ring() {
+    // Fasengroesse an der Aussenkante des aeusseren Rings
+    ring_chamfer = 2; // radiale Breite der Fase (und axiale Hoehe = Ringhoehe = 2)
+
+    difference() {
+        union() {
+            // Aeusserer Ring mit Fase an der Unterkante:
+            // Bei Z=0 (unten) ist der Aussendurchmesser um 2*ring_chamfer kleiner,
+            // bei Z=2 (oben) hat er den vollen Aussendurchmesser 246.
+            cylinder(h=2, d1=246 - 2 * ring_chamfer, d2=246);
+            cylinder(h=16, d=190);
+        }
+        translate([0, 0, -1])
+        cylinder(h=18, d=186);
+    }
+}
+
+module wall_bushing_led_ring_holder_bottom() {
+
+    difference() {
+        cylinder(h=7, d=57);
+
+        translate([0, 0, 2])
+        cylinder(h=7, d=53);
+
+        translate([12, -12, -1])
+        cylinder(h=4, d=18);
+
+        // 2 Schraubenlöcher diagonal auf Kreisdurchmesser 40mm
+        for (i = [0 : 1])
+            rotate([0, 0, 45 + i * 180])
+            translate([40 / 2, 0, -eps])
+            cylinder(h=7 + 2 * eps, d=3);
+    }
+
+    // 4 Zylinder auf Kreisdurchmesser 46,5mm, Durchmesser 2mm
+    for (i = [0 : 3])
+        rotate([0, 0, i * 90])
+        translate([46.5 / 2, 0, 2])
+        cylinder(h=2, d=2);
+
+}
+
+module wall_bushing_led_ring_holder_top() {
+
+    difference() {
+        cylinder(h=9, d=61.1);
+
+        translate([0, 0, -1])
+        cylinder(h=9.6, d=57.1);
+    }
+}
+
 // --- Vorschau ---
 
-// translate([0, 60, 0])
+// // translate([0, 60, 0])
 // wall_bushing_inner();
 
-color("lightblue")
-//translate([0, 60, wall_bushing_part_length - wall_bushing_socket_depth + 10])
-translate([150, 0, -200])
-wall_bushing_outer();
+// color("lightblue", 0.2)
+// translate([0, 0, 0])
+// wall_bushing_outer();
 
-// Zentrierring separat daneben anzeigen
+// //Zentrierring separat daneben anzeigen
 // color("orange")
 // translate([0, 60, 100])
 // centering_ring();
@@ -370,3 +692,27 @@ wall_bushing_outer();
 // color("orange")
 // translate([0, 60, 300])
 // centering_ring();
+
+//Magnetring anzeigen
+// color("gold", 0.8)
+// translate([0, 0, 230])
+// exhaust_hose_connector();
+
+// 90-Grad-Bogen-Variante anzeigen
+// color("limegreen", 0.8)
+// translate([400, 0, 230])
+// exhaust_hose_connector_90_degree();
+
+// KG Rohr apdaper innne
+color("brown", 0.8)
+exhaust_hose_connector_kg_adapter();
+
+
+
+// wall_bushing_ring();
+
+// wall_bushing_led_ring_holder_bottom();
+
+// translate([0, 0, 0])
+// wall_bushing_led_ring_holder_top();
+
