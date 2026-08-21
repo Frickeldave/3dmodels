@@ -82,9 +82,9 @@ divider_y_thickness = 1.2; // .05
 // Cut holes into the solid fill
 cut_fill_holes = true;
 // Shape of the holes: 0=round, 1=hexagon (for bits)
-fill_hole_shape = 1; // [0:Round, 1:Hexagon]
+fill_hole_shape = 0; // [0:Round, 1:Hexagon]
 // Diameter of round holes in mm
-fill_hole_diameter = 4; // .1
+fill_hole_diameter = 3.5; // .1
 // Flat-to-flat width of hexagon holes in mm (1/4" bit = 6.35mm)
 fill_hex_width = 8; // .1
 // Number of holes in X direction

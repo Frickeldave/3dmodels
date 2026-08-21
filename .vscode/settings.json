@@ -1,0 +1,12 @@
+{
+    "chat.tools.terminal.autoApprove": {
+        "/^cd /home/david/dev/private/3dmodels/models/custom/Spotlight && timeout 120 openscad-nightly -o /tmp/spotlight_full2\\.png --imgsize=1200,1200 --camera=0,0,150,60,0,25,600 --colorscheme=Tomorrow Spotlight\\.scad 2>&1 \\| tail -50$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^cd /home/david/dev/private/3dmodels/models/custom/Spotlight && timeout 120 openscad-nightly -o /tmp/spotlight_bottom\\.png --imgsize=1200,1200 --camera=0,0,20,60,0,25,500 --colorscheme=Tomorrow Spotlight\\.scad 2>&1 \\| tail -20$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
+    }
+}

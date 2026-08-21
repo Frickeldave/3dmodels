@@ -31,5 +31,5 @@ difference() {
     cylinder(h=20, r=2.5);
 
     translate([98, 0, -1])
-    cylinder(h=21, r=4, $fn=6);
+    cylinder(h=21, r=5.0, $fn=6);
 }
