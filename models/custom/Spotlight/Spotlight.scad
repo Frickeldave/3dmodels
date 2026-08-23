@@ -138,7 +138,10 @@ _bcr_screw_hole_dia      = 10;   // Durchmesser des Durchgangslochs (nur barndoo
 _bracket_length               = 180;                          // Länge der Bügelarme von der Drehachse bis zur Basis [mm]
 _bracket_thickness            = _spotlight_material_thickness; // Materialstärke des Bügels [mm]
 _bracket_width                = _bcr_insert_boss_dia;         // Breite der Bügelarme [mm]
-_bracket_hole_clearance       = 1.0;                         // Zusätzliches Spiel im Durchgangsloch für die Schraube [mm]
+// Major-Radius des BCR-Innengewindes inkl. BOSL2-Facettenkorrektur (1/cos) und
+// 2*Slop. Wird für Bohrungen und den Verzahnungs-Innenradius verwendet, damit
+// diese exakt bündig an das Gewinde anschließen (keine dünne Wand/Lippe stehen bleibt).
+_bcr_thread_major_r          = _bcr_insert_dia/2 / cos(180/quantup(segs(_bcr_insert_dia/2), _bcr_thread_starts)) + 2*_bcr_thread_slop;
 _bracket_reinforcement_dia    = _bcr_insert_boss_dia;        // Außendurchmesser des Verstärkungsrings [mm]
 _bracket_reinforcement_height = 4;                          // Höhe des Verstärkungsrings Richtung Boss (Reibfläche) [mm]
 _bracket_tooth_count          = 12;                         // Anzahl der radialen Reib-Zähne im Verstärkungsring (Breite & Tiefe werden daraus abgeleitet)
@@ -156,7 +159,7 @@ _bracket_rib_taper_length     = 10;                         // Länge des Auslau
 _bracket_mount_disc_dia          = _bcr_insert_boss_dia;    // Außendurchmesser der Scheibe [mm]
 _bracket_mount_disc_thickness    = _spotlight_material_thickness; // Dicke der Scheibe ohne Zähne [mm]
 _bracket_mount_disc_tooth_count  = _bracket_tooth_count;   // Anzahl der Radialzähne auf der Scheibe
-_bracket_mount_hole_dia          = _bcr_insert_dia + _bracket_hole_clearance; // Durchmesser der zentralen Bohrung (mit Spiel, wie die seitlichen Löcher) [mm]
+_bracket_mount_hole_dia          = 2 * _bcr_thread_major_r; // Durchmesser der zentralen Bohrung (bündig zum Innengewinde-Major) [mm]
 
 // --- Barndoor-Bracket-Holder (Gegenplatte zur Befestigungsscheibe) ---------
 // Platte (rechteckig oder oval) mit zentralem Boss-Zylinder, in den die
@@ -428,16 +431,25 @@ module female_thread_socket(length) {
 //     Querschnitt); halbe Diagonale = _tooth_depth.
 // Die Zähne verlaufen radial von r_in bis r_out; offset_deg verdreht das Muster.
 module serration_diamonds(r_in, r_out, offset_deg = 0) {
-    _hole_r      = (_bcr_insert_dia + _bracket_hole_clearance) / 2;
+    _hole_r      = _bcr_thread_major_r;
     _tooth_depth = min(PI * _hole_r / _bracket_tooth_count, _bracket_reinforcement_height * 0.7);
     _tooth_side  = _tooth_depth * sqrt(2);
     _eps         = 0.01;
 
+    // Jeder Zahn ist ein um 45° gedrehter Quader (Diamant-Querschnitt), der
+    // radial von der Mittelachse (x = -_eps) bis r_out durchläuft. Die
+    // Innenkante wird dabei bewusst NICHT vom Quader selbst gebildet (dessen
+    // tangentiale Innenfläche ließe Ecken bis r = sqrt(r_in² + _tooth_depth²)
+    // stehen), sondern von der zentralen Bohrung des jeweiligen Bauteils
+    // (Bohrung/Gewinde im Major-Radius _bcr_thread_major_r). Dadurch liegt die
+    // Innenkante der Verzahnung exakt zylindrisch und bündig zur Bohrung –
+    // keine dünne Wand/Lippe zwischen Gewinde und Zähnen, und die CSG-Baumgröße
+    // bleibt klein (nur einfache Quader, keine Donut-Schnitte).
     for (i = [0 : _bracket_tooth_count - 1])
         rotate([0, 0, offset_deg + i * 360 / _bracket_tooth_count])
         rotate([45, 0, 0])
-        translate([r_in, -_tooth_side / 2, -_tooth_side / 2])
-        cube([r_out - r_in + _eps, _tooth_side, _tooth_side]);
+        translate([-_eps, -_tooth_side / 2, -_tooth_side / 2])
+        cube([r_out + 2 * _eps, _tooth_side, _tooth_side]);
 }
 
 // Barndoor-Clamp-Ring: eigenständiges Bauteil, das konzentrisch um das
@@ -464,7 +476,7 @@ module barndoor_clamp_ring() {
 
         // Radiale Reichweite der Verzahnung: vom Bügel-Lochrand bis zum
         // Boss-Außenrand (deckungsgleich mit den V-Nuten im Verstärkungsring).
-        _face_r_in  = (_bcr_insert_dia + _bracket_hole_clearance) / 2;
+        _face_r_in  = _bcr_thread_major_r;
         _face_r_out = _bcr_insert_boss_dia / 2;
 
         translate([sign * (_outer_r - _embed), 0, _ring_gap / 2])
@@ -542,7 +554,7 @@ module barndoor_bracket() {
     _arm_outer_x  = _arm_inner_x + _bracket_thickness;       // Außenfläche des Arms
     _z_pivot      = _ring_gap / 2;                           // Höhe der Boss-/Schraubenachse
     _z_base       = _z_pivot - _bracket_length;              // Höhe der Basis-Querstrebe
-    _hole_r       = (_bcr_insert_dia + _bracket_hole_clearance) / 2;
+    _hole_r       = _bcr_thread_major_r;
     _reinf_r      = _bracket_reinforcement_dia / 2;
     _eps          = 0.01;
     _rib_start_z  = _z_base + _bracket_thickness;
@@ -757,6 +769,14 @@ module barndoor_bracket_holder() {
     _face_r_in  = _bracket_mount_hole_dia / 2;
     _face_r_out = _bracket_mount_disc_dia / 2;
 
+    // Zahn-/Nut-Tiefe (identisch zur Berechnung in serration_diamonds). Das
+    // Innengewinde endet auf Höhe der Nut-Täler, damit die Gewinde-Crests nicht
+    // in die Verzahnung ragen und die Befestigungsscheibe plan auf den Zähnen
+    // aufliegen kann. Darüber sitzt eine glatte Bohrung im Major-Durchmesser.
+    _tooth_depth = min(PI * _face_r_in / _bracket_tooth_count, _bracket_reinforcement_height * 0.7);
+    _thread_top  = _boss_h - _tooth_depth;
+    _thread_len  = _thread_top - (_boss_h - _bcr_insert_depth);
+
     // Scheiben-Halbmesser und Bohrungspositionen. Der Randabstand wird so
     // geklemmt, dass die Senkkopf-Senkung (Radius _csk_r) unabhängig von der
     // gewählten Plattengröße immer vollständig auf der Scheibe bleibt.
@@ -888,19 +908,26 @@ module barndoor_bracket_holder() {
 
             // Buttress-Innengewinde, identisch zum insert_boss des
             // barndoor_clamp_ring: Schraube tritt von oben ein (lokale +Z
-            // nach unten), daher Schneidkörper axial um 180° gedreht.
-            translate([0, 0, _boss_h + 1])
-            rotate([180, 0, 0])
+            // nach unten). Die schräge (45°) Flanke des Sägezahnprofils zeigt
+            // dabei nach OBEN (+Z), die senkrechte (90°) Flanke nach unten.
+            // So ist das Innengewinde druckbar, wenn der Holder zum Drucken
+            // um 180° gedreht wird: nach dem Wenden zeigt die 45°-Flanke nach
+            // unten (selbsttragender Überhang), die 90°-Flanke nach oben.
+            // anchor = TOP hält das Gewinde in derselben Z-Position wie zuvor
+            // (rotate([180,0,0]) + anchor = BOTTOM), spiegelt aber das
+            // asymmetrische Flankenprofil – ohne die Gewindehändigkeit zu
+            // ändern (eine 180°-Rotation um X ist eine eigentliche Drehung).
+            translate([0, 0, _thread_top])
             buttress_threaded_rod(
                 d           = _bcr_insert_dia,
-                l           = _bcr_insert_depth + 1,
+                l           = _thread_len,
                 pitch       = _bcr_thread_pitch,
                 starts      = _bcr_thread_starts,
                 internal    = true,
                 bevel       = false,
                 blunt_start = true,
                 $slop       = _bcr_thread_slop,
-                anchor      = BOTTOM
+                anchor      = TOP
             );
 
             // V-Nuten auf der Stirnfläche: subtrahierte serration_diamonds,
@@ -915,6 +942,13 @@ module barndoor_bracket_holder() {
             // Gewinde hinein, damit an der Übergangskante kein Artefakt entsteht.
             translate([0, 0, -1])
             cylinder(h = _boss_h - _bcr_insert_depth + 1.1, r = _bcr_insert_dia / 2);
+
+            // Glatte Bohrung oberhalb des Gewindes bis zur Stirnfläche, im
+            // Major-Durchmesser des Gewindes (= _bracket_mount_hole_dia). Sie
+            // endet auf Höhe der Nut-Täler, sodass die Verzahnung frei bleibt
+            // und die Befestigungsscheibe plan auf den Zähnen aufliegt.
+            translate([0, 0, _thread_top - _eps])
+            cylinder(h = _boss_h - _thread_top + _eps + 1, r = _bracket_mount_hole_dia / 2);
         }
 
         // Verstärkungsring um die Boss-Basis, mit 45°-Fase an der oberen
@@ -1029,6 +1063,21 @@ module barndoor_bracket_holder_case() {
                         translate([0, 0, _w])
                         linear_extrude(height = _h - _w + 1)
                         scale([_half_x - _w, _half_y - _w]) circle(r = 1);
+
+                        // Aufgeweitete Bohrung im Gewindebereich: gibt dem
+                        // Außengewinde des Holders (Radius = _thread_mating_dia/2)
+                        // das Radialspiel (2 * _thread_slop), das die Referenz-
+                        // Verbindung (light_fixture <-> barndoor_housing) über den
+                        // $slop ihres Innengewinde-Schneidkörpers erhält. Ohne diese
+                        // Bohrung läge der Gewindegrund exakt auf dem Gehäuse-
+                        // Innenradius und würde klemmen.
+                        if (_bracket_holder_connection == "screw_connection")
+                            translate([0, 0, _h - _thread_engagement_length])
+                            linear_extrude(height = _thread_engagement_length + 1)
+                            scale([
+                                _half_x - _w + 2 * _thread_slop,
+                                _half_y - _w + 2 * _thread_slop
+                            ]) circle(r = 1);
                     }
                 } else {
                     // Rechteckige Hülse: Boden + Wände, oben offen
@@ -1038,6 +1087,15 @@ module barndoor_bracket_holder_case() {
 
                         translate([-_half_x + _w, -_half_y + _w, _w])
                         cube([2 * _half_x - 2 * _w, 2 * _half_y - 2 * _w, _h - _w + 1]);
+
+                        // Aufgeweitete Bohrung im Gewindebereich (siehe runde Hülse)
+                        if (_bracket_holder_connection == "screw_connection")
+                            translate([0, 0, _h - _thread_engagement_length])
+                            cube([
+                                2 * (_half_x - _w + 2 * _thread_slop),
+                                2 * (_half_y - _w + 2 * _thread_slop),
+                                _thread_engagement_length + 1
+                            ], center = [true, true, false]);
                     }
                 }
 
@@ -1128,23 +1186,42 @@ module barndoor_bracket_holder_case() {
 // zum Innengewinde in den Bossen des barndoor_clamp_ring. Der Schaft trägt
 // das Außengewinde; der Kopf ist ein Zylinder mit umlaufender Rändelung
 // (senkrechte Rillen) für Handbetätigung.
-module barndoor_clamp_screw() {
+module barndoor_clamp_screw(thread_flipped = false) {
     _shaft_length = _bcr_screw_total_length - _bcr_screw_head_height;
     _knurl_r = _bcr_screw_head_dia / 2;
 
     union() {
-        // Schaft mit Außengewinde
+        // Schaft mit Außengewinde.
+        // thread_flipped = false: schräge (45°) Flanke zeigt nach unten
+        // (Standard, druckbar mit Kopf auf dem Druckbett, Spitze oben).
+        // thread_flipped = true: schräge Flanke zeigt nach oben – passend zum
+        // umgedrehten Holder-Innengewinde. anchor = TOP + rotate([180,0,0])
+        // hält den Schaft in derselben Z-Lage, spiegelt aber das asymmetrische
+        // Sägezahnprofil (Handigkeit bleibt erhalten, 180°-Drehung um X).
         translate([0, 0, _bcr_screw_head_height])
-        buttress_threaded_rod(
-            d           = _bcr_insert_dia,
-            l           = _shaft_length,
-            pitch       = _bcr_thread_pitch,
-            starts      = _bcr_thread_starts,
-            internal    = false,
-            bevel       = false,
-            blunt_start = true,
-            anchor      = BOTTOM
-        );
+        if (thread_flipped)
+            rotate([180, 0, 0])
+            buttress_threaded_rod(
+                d           = _bcr_insert_dia,
+                l           = _shaft_length,
+                pitch       = _bcr_thread_pitch,
+                starts      = _bcr_thread_starts,
+                internal    = false,
+                bevel       = false,
+                blunt_start = true,
+                anchor      = TOP
+            );
+        else
+            buttress_threaded_rod(
+                d           = _bcr_insert_dia,
+                l           = _shaft_length,
+                pitch       = _bcr_thread_pitch,
+                starts      = _bcr_thread_starts,
+                internal    = false,
+                bevel       = false,
+                blunt_start = true,
+                anchor      = BOTTOM
+            );
 
         // Rändelkopf: Kopf-Grundkörper (Zylinder) mit aufgesetzten
         // Fasen-Kegelringen an Ober- und Unterseite, aus dem die
@@ -1194,7 +1271,7 @@ module barndoor_clamp_screw() {
 // durchbohrt — z.B. für eine Kabeldurchführung durch die Schraube.
 module barndoor_clamp_screw_hollow() {
     difference() {
-        barndoor_clamp_screw();
+        barndoor_clamp_screw(thread_flipped = true);
 
         // Durchgangsloch über die volle Schraubenhöhe
         translate([0, 0, -_bcr_screw_chamfer - 1])
